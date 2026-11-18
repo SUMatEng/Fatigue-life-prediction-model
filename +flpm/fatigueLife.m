@@ -156,8 +156,8 @@ if n > 1
     % distance to the BS 7910 interaction limit, which moves at most at
     % 3 (dr1 + dr2)/dN (flpm.internal.coalesce)
     rr = r + r.';
-    g = max(hypot(S.s - S.s.', S.z - S.z.') - rr, 0);
-    gapA = hypot(abs(S.y - S.y.'), g) - rr;
+    gIn = max(hypot(S.s - S.s.', S.z - S.z.') - rr, 0);
+    gapA = hypot(abs(S.y - S.y.'), gIn) - rr;
     sx = abs(S.s - S.s.') - rr;  sz = abs(S.z - S.z.') - rr;
     gapC = min(max(sx - 2*min(r, r.'), sz), max(sz - rr, sx));
     gap = max(gapA, gapC);
