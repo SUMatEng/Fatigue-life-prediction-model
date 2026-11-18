@@ -45,13 +45,16 @@ classdef FlpmSolverTest < matlab.unittest.TestCase
             tc.verifyTrue(all(diff(s) < 0));
         end
 
-        function strengthIncreasesWithDepth(tc)
-            % the same pore is less severe the deeper it lies (Acta Mater.
-            % 2022, Fig. 9)
-            depths = [0.02 0.06 0.5 2];
+        function nearSurfaceDefectIsMostSevere(tc)
+            % Murakami: a pore whose ligament is within the proximity limit
+            % acts as a larger surface defect, so it is more severe than the
+            % same pore deep inside or cut by the surface (less area inside).
+            % sqrt(area) = 0.05 mm: r = 0.028 mm, proximity limit z = 0.063 mm
+            depths = [0.01 0.06 0.5 2];
             s = arrayfun(@(z) flpm.fatigueStrength(flpm.defectSet(0.05, z, 0), tc.mat).stress, depths);
-            tc.verifyTrue(all(diff(s) >= 0));
-            tc.verifyGreaterThan(s(end), s(1));
+            tc.verifyLessThan(s(2), s(1));
+            tc.verifyLessThan(s(2), s(3));
+            tc.verifyLessThanOrEqual(s(3), s(4) + 1e-9);
         end
 
         function bracketSolutionHitsTarget(tc)
