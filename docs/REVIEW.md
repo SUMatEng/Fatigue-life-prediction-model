@@ -39,21 +39,30 @@ along it. Results are median and interquartile range, in MPa:
   severity beyond what volume 2 already has.
 
 
-### Defect clustering (18 Nov 2026)
+### Defect clustering (18 Nov 2026, revised)
 
 Fits with `flpm.fitClustering`:
 
 | Data | n | Window | κ | μ | σ (mm) | G test p (Thomas / Poisson) |
 |---|---|---|---|---|---|---|
-| Ti64 XCT behind [M] (`XCTdefects.xlsx`) | 98 | disc R 2.55 mm (0.1 mm slab, treated as 2D) | = λ (4.8 /mm²) | 1.0 | – | 0.055 / 0.075 |
+| Ti64 bars 21 / 22 / 23 behind [M] (`CT_excel.xlsx`, 3D), homogeneous null | 97 / 157 / 123 | cylinder R 3.6 mm × 9.9 mm | – | – | – | Poisson rejected (p = 0.005 each) |
+| same, inhomogeneous null (`'Intensity', 'radial'`) | | | 0.23 / 0.38 / 0.27 /mm³ | 1.00 / 1.00 / 1.15 | – / – / [0.20 0.28] | 0.26 / 0.21 / 0.28 (Thomas), 0.17 / 0.21 / 0.04 (Poisson) |
+| `XCTdefects.xlsx` (0.1 mm slab, 2D; not the [M] bars) | 98 | disc R 2.55 mm | = λ | 1.0 | – | 0.055 / 0.075 |
 | NTU XY export (3D) | 27 541 | cylinder R 2.3 mm × 8.4 mm | 3.4 /mm³ | 58 | 0.34 in-plane, 0.22 axial | 0.025 / 0.025 |
 | NTU ZX export (3D) | 9 451 | cylinder R 2.3 mm × 8.7 mm | (degenerate) | – | in-plane at the cap, 0.18 axial | 0.63 / 0.025 |
 
-* **Ti64 XCT:** there is no detectable clustering. Complete spatial
-  randomness is not rejected, the fit collapses to μ = 1, and size is
-  uncorrelated with depth (ρ = 0.09, p = 0.38) and with the size of the
-  nearest neighbour (p = 0.12). With 98 defects in one thin slab, the
-  power of these tests is low.
+* **Ti64 bars of [M]:** the porosity is concentrated near the surface (median
+  depth 0.25–0.34 mm in a 3.65 mm-radius bar). Against a homogeneous null
+  that gradient looks like clustering. Against an inhomogeneous Poisson
+  null, with the intensity a function of depth (which the population
+  model already represents through its depth distribution), bars 21 and 22
+  show no clustering (μ = 1). Bar 23 shows a weak excess of close pairs
+  (Poisson p = 0.04, μ = 1.15, σ ≈ 0.2–0.3 mm). Size does not correlate
+  with the neighbour's size in any bar. Size correlates with depth only in
+  bar 23 (Spearman 0.22, p = 0.013).
+* A first version of this section used `XCTdefects.xlsx`, a 0.1 mm slab
+  that is not the data behind [M]. Its conclusion (no clustering) stands
+  for the [M] bars, but for the reason given above.
 * **NTU XY:** K exceeds the Poisson value by 15–25% between 0.1 and 0.5 mm,
   a mild clustering on the 0.3 mm scale. Below about 0.05 mm, G lies below
   both models (inhibition: pores do not overlap, and segmentation merges
@@ -106,6 +115,36 @@ of strength in MPa:
 * Monte Carlo remains necessary when defects lie in one plane or cluster
   (Sections above).
 
+
+### Scatter sources (18 Nov 2026)
+
+* **Size–depth dependence** (`flpm.testDependence`, copula option): it is
+  warranted only for bar 23 (Gaussian ρ = 0.21). Including it changes the
+  volume 3 strength by at most 5 MPa (10% quantile 261 → 266 MPa, median
+  unchanged). The simulated [M] sets carry no dependence (|ρ_s| < 0.02).
+* **XCT truncation** (`flpm.fitSizeDistribution`): truncated and naive fits
+  differ by < 3% in median and 99th percentile for these data, because the
+  smallest recorded pores (26–37 µm) lie well below the median
+  (50–60 µm). The estimated share of pores below the limit is 1–5%.
+* **Bootstrap of the size descriptor** (`flpm.bootstrapStrength`, 200
+  replicates of the 157 pores of bar 22, truncated lognormal refit, depth
+  and count as for volume 2): estimate 233 / 275 / 289 MPa (10/50/90%),
+  with 95% intervals [232, 235], [270, 283] and [285, 296] MPa. The
+  sampling uncertainty of the size distribution is therefore about
+  ±5–10 MPa on the median. That is smaller than the volume-to-volume
+  differences in Table 5.
+* **Threshold scatter**, specimen to specimen, CoV of ΔK_th,lc = 0.10
+  (illustrative; no measured value is available). 10/50/90% quantiles in
+  MPa:
+
+| Volume | CoV 0 | CoV 0.10 |
+|---|---|---|
+| 1 | 261 / 304 / 319 | 265 / 303 / 324 |
+| 2 | 224 / 277 / 290 | 225 / 276 / 297 |
+| 3 | 261 / 279 / 291 | 259 / 279 / 298 |
+
+  The scatter is dominated by the defect population. A 10% threshold
+  scatter widens only the upper tail, by 5–7 MPa.
 
 ### Validation tools: first use (18 Nov 2026)
 

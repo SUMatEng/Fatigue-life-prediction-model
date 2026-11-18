@@ -61,6 +61,7 @@ axial positions with `flpm.defectSet(size, depth, position, 'Axial', y)`.
 | `flpm.arrestMap`, `flpm.weakestLink` | Closed-form strength distribution P_s = exp(−Λ), stress fields, killer probabilities |
 | `flpm.fitSN`, `flpm.compareSN` | Random fatigue-limit S–N fit (censored run-outs); test of the predicted limit |
 | `flpm.killerDistribution` | Predicted killer size/depth, KS tests vs fractography |
+| `flpm.testDependence`, `flpm.fitSizeDistribution`, `flpm.bootstrapStrength` | Size–depth copula test, truncated size fits, bootstrap bands; `mat.dKth_cov` threshold scatter |
 | `flpm.clustering` | Thomas cluster process for defect locations (`'Clustering'` of a population) |
 | `flpm.fitClustering` | Fit κ, μ, σ to measured centres (Ripley's K, minimum contrast), G-test, mark tests |
 

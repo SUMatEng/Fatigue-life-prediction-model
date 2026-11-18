@@ -171,6 +171,28 @@ distributions, from the weakest-link killer probabilities or the Monte
 Carlo killers. With fractographic data it adds one-sample
 Kolmogorov–Smirnov tests.
 
+## Scatter sources
+
+* **Threshold:** `mat.dKth_cov` is the coefficient of variation of
+  ΔK_th,lc between specimens (lognormal, median ΔK_th,lc). Through the
+  El Haddad length, it also scatters the closure length l. Monte Carlo
+  draws it once per simulation from its own random stream. The weakest
+  link integrates over it by 7-point Gauss–Hermite quadrature, with one
+  arrest map per node. ΔK_th,eff is kept fixed. **Flag:** whether the
+  scatter is better treated per specimen (as here) or per defect, as
+  microstructural variation would suggest, needs your judgement.
+* **Size–depth dependence:** `'Copula'` (Gaussian or t) on a volumetric
+  population couples the size and depth draws. In the closed form it
+  enters as joint quadrature weights. `flpm.testDependence` decides
+  whether it is warranted (AIC and likelihood-ratio test against
+  independence).
+* **Detection limit:** `flpm.fitSizeDistribution` fits a size distribution
+  left-truncated at the XCT detection limit u. Use it with
+  `'SizeBounds', [u Inf]` and the count of detected defects.
+* **Sampling uncertainty:** `flpm.bootstrapStrength` resamples the defect
+  data, refits the descriptors with a user function, and returns
+  confidence intervals of the strength quantiles. It uses the closed form.
+
 ## Defect clustering (Thomas process)
 
 Defect locations are by default independent (a Poisson process). A
@@ -200,6 +222,11 @@ population can instead be clustered with `'Clustering', flpm.clustering(...)`
 * Validation by a Monte Carlo deviation test on the border-corrected
   nearest-neighbour distribution G(r), against the fitted Thomas process
   and against Poisson.
+* `'Intensity', 'radial'` (or a handle λ(x)): inhomogeneous K
+  (Baddeley, Møller & Waagepetersen, Stat. Neerl. 54 (2000) 329), the
+  inhomogeneous Thomas process (Waagepetersen, Biometrics 63 (2007) 252),
+  and nulls thinned to λ(x). Use it for near-surface porosity, which is
+  otherwise mistaken for clustering.
 * Mark tests: a random-labelling permutation test of nearest-neighbour size
   correlation, and the Spearman correlation of size with depth.
 
