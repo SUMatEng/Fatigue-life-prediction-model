@@ -1,109 +1,80 @@
-function sets = samplePopulation(pops, geom, nSim, varargin)
+function sets = samplePopulation(pops, nSim, varargin)
 %FLPM.SAMPLEPOPULATION  Draw Monte Carlo defect sets from population descriptors.
 %
-%   sets = flpm.samplePopulation(pops, geom, nSim)
-%   sets = flpm.samplePopulation(pops, geom, nSim, 'Seed', 42)
-%   set  = flpm.samplePopulation(pops, geom, 'simulation', k, 'Seed', 42)
+%   sets = flpm.samplePopulation(pops, nSim, 'SurfaceLength', L, 'Seed', 42)
+%   set  = flpm.samplePopulation(pops, 'simulation', k, 'SurfaceLength', L)
 %
-%   pops  one flpm.defectPopulation struct, or a cell array/struct array of
-%         them; the sampled sets of all populations are appended (Mater. Des.
-%         Sec. 6.3: "sampled populations appended together").
-%   Returns a cell array of nSim defect sets (or one set in the second form),
-%   each a struct with column vectors
-%       size (mm), radius (mm), angle (rad), aspect, yFloor, population
-%   ready for flpm.fatigueLife / flpm.fatigueStrength.
+%   pops  one flpm.defectPopulation struct or a cell array of them; the
+%         sets of all populations are appended.
+%   'SurfaceLength'  length L (mm) of free surface represented by one
+%         simulation (for a round bar of diameter D, L = pi*D). It sets the
+%         number of defects for 'CountPerLength' populations and the range
+%         of positions along the surface, i.e. the size of the statistical
+%         sample. It does not enter the stress-intensity solution. Required.
+%   'Seed'  seed of the random streams                               [0]
 %
-%   Reproducibility: simulation k always uses substream k of an mrg32k3a
-%   stream seeded with 'Seed', independent of the order of evaluation, so
-%   results are identical in serial and parallel runs.
+%   Each set is a struct with column vectors size (sqrt(area), mm), depth
+%   (mm), position (mm, uniform on [0, L)) and population (index).
+%   Surface valleys of depth Rv and shielding factor Y_R become surface-
+%   breaking discs centred on the surface whose part below the surface has
+%   sqrt(area) = (Y_R/0.65)^2 Rv, so that K = Y_R s sqrt(pi Rv).
 %
-%   Descriptors are assumed statistically independent (as in the paper,
-%   Sec. 6.2); see docs/REVIEW.md for the copula option.
+%   Simulation k always uses substream k of an mrg32k3a stream seeded with
+%   'Seed', so results do not depend on the order of evaluation.
 
 ip = inputParser;
 ip.addParameter('Seed', 0);
 ip.addParameter('simulation', []);
+ip.addParameter('SurfaceLength', [], @(x) isscalar(x) && x > 0);
 if ischar(nSim) || isstring(nSim)
     varargin = [{nSim}, varargin];
     nSim = [];
 end
 ip.parse(varargin{:});
+L = ip.Results.SurfaceLength;
+if isempty(L)
+    error('flpm:sample:length', '''SurfaceLength'' (mm) is required.');
+end
+if isstruct(pops), pops = num2cell(pops); end
 seed = ip.Results.Seed;
-pops = normalise(pops);
-
 if ~isempty(ip.Results.simulation)
-    sets = drawOne(pops, geom, seed, ip.Results.simulation);
+    sets = drawOne(pops, L, seed, ip.Results.simulation);
     return
 end
 sets = cell(nSim, 1);
 for k = 1:nSim
-    sets{k} = drawOne(pops, geom, seed, k);
+    sets{k} = drawOne(pops, L, seed, k);
 end
 end
 
-function pops = normalise(pops)
-if isstruct(pops)
-    pops = num2cell(pops);
-end
-if ~iscell(pops)
-    error('flpm:sample:pops', 'Populations must be a struct or cell array.');
-end
-end
-
-function set = drawOne(pops, geom, seed, k)
+function set = drawOne(pops, L, seed, k)
 rs = RandStream('mrg32k3a', 'Seed', seed);
 rs.Substream = k;
-Rb = geom.D / 2;
+Ys = flpm.internal.constants().Ysurface;
 parts = cell(numel(pops), 1);
 for j = 1:numel(pops)
     p = pops{j};
-    n = defectCount(p, geom, rs);
+    if ~isempty(p.countPerLength), mu = p.countPerLength * L; else, mu = p.count; end
+    if strcmp(p.countModel, 'poisson'), n = poissinv(rand(rs), mu); else, n = round(mu); end
     sz = flpm.internal.sampleDescriptor(p.size, n, p.sizeBounds, rs) + p.sizeOffset;
-    ang = flpm.internal.sampleDescriptor(p.angle, n, [-pi pi], rs);
-    switch p.location
-        case 'radius'
-            b = p.positionBounds; if isempty(b), b = [0 Rb]; end
-            rad = flpm.internal.sampleDescriptor(p.position, n, b, rs);
-        case 'depth'
-            b = p.positionBounds; if isempty(b), b = [0 Rb]; end
-            rad = Rb - flpm.internal.sampleDescriptor(p.position, n, b, rs);
-        case 'surface'
-            rad = repmat(Rb, n, 1);       % centred on the free surface
+    if strcmp(p.type, 'volumetric')
+        dep = flpm.internal.sampleDescriptor(p.depth, n, p.depthBounds, rs);
+    else
+        dep = zeros(n, 1);
     end
-    asp = flpm.internal.sampleDescriptor(p.aspect, n, p.aspectBounds, rs);
+    pos = L * rand(rs, n, 1);
     if ~isempty(p.threshold)
         keep = sz > p.threshold;
-        sz = sz(keep); rad = rad(keep); ang = ang(keep); asp = asp(keep);
+        sz = sz(keep); dep = dep(keep); pos = pos(keep);
         n = numel(sz);
     end
-    if strcmp(p.type, 'surface') && ~isempty(p.shielding)
-        yf = repmat(p.shielding, n, 1);
-    else
-        yf = repmat(geom.surfaceY, n, 1);
+    if strcmp(p.type, 'surface')
+        sz = sqrt(2) * (p.shielding / Ys)^2 * sz;   % half-disc below the surface
     end
-    parts{j} = [sz, rad, ang, asp, yf, repmat(j, n, 1)];
+    parts{j} = [sz, dep, pos, repmat(j, n, 1)];
 end
 M = vertcat(parts{:});
-set = struct('size', M(:,1), 'radius', M(:,2), 'angle', M(:,3), ...
-    'aspect', M(:,4), 'yFloor', M(:,5), 'population', M(:,6));
-end
-
-function n = defectCount(p, geom, rs)
-if ~isempty(p.countPerLength)
-    mu = p.countPerLength * pi * geom.D;
-else
-    mu = p.count;
-end
-switch p.countModel
-    case 'fixed'
-        n = round(mu);
-    case 'poisson'
-        n = poissonFromStream(mu, rs);    % reproducible: uses rs
-end
-end
-
-function n = poissonFromStream(mu, rs)
-% Inverse-CDF Poisson draw from a given RandStream.
-u = rand(rs);
-n = poissinv(u, mu);
+if isempty(M), M = zeros(0, 4); end
+set = struct('size', M(:,1), 'depth', M(:,2), 'position', M(:,3), ...
+    'population', M(:,4));
 end

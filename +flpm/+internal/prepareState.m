@@ -1,16 +1,11 @@
-function S = prepareState(defects, geom)
+function S = prepareState(defects)
 %PREPARESTATE  Convert a defect set (mm, public API) to the SI solver state.
 %   defects: struct with column (or row) vectors
-%       size    sqrt(area) of each defect, mm
-%       radius  radial position of the defect centre from the bar axis, mm
-%       angle   angular position, rad
-%       aspect  projected aspect ratio a/c (<= 1)
-%     optional
-%       yFloor      lower bound on Y once the defect breaks the surface
-%                   (roughness shielding factor). Default geom.surfaceY.
-%       population  population index (bookkeeping only)
+%       size      sqrt(area) of the whole defect, mm
+%       depth     depth of the defect centre below the free surface, mm (>= 0)
+%       position  position of the centre along the free surface, mm
 n = numel(defects.size);
-req = {'size', 'radius', 'angle', 'aspect'};
+req = {'size', 'depth', 'position'};
 for k = 1:numel(req)
     if ~isfield(defects, req{k}) || numel(defects.(req{k})) ~= n
         error('flpm:defects:field', ...
@@ -24,21 +19,14 @@ sz = defects.size(:);
 if any(~isfinite(sz)) || any(sz <= 0)
     error('flpm:defects:size', 'Defect sizes must be positive and finite.');
 end
-rad = defects.radius(:);
-if any(rad < 0) || any(rad > geom.D/2 + 1e-12)
-    error('flpm:defects:radius', ...
-        'Radial positions must lie in [0, D/2] = [0, %g] mm.', geom.D/2);
+dep = defects.depth(:);
+if any(~isfinite(dep)) || any(dep < 0)
+    error('flpm:defects:depth', 'Defect depths must be finite and >= 0.');
 end
-
-S.a = sz / 1000;                              % m
-[S.x, S.y] = pol2cart(defects.angle(:), rad / 1000);
-S.asp = defects.aspect(:);
-S.ext = zeros(n, 1);                          % crack extension (Delta a)
-if isfield(defects, 'yFloor') && ~isempty(defects.yFloor)
-    S.yfloor = defects.yFloor(:) .* ones(n, 1);
-else
-    S.yfloor = geom.surfaceY * ones(n, 1);
-end
-S.id = (1:n)';                                % original index
-S.dK = zeros(n, 1);                           % last computed nominal dK
+S.a   = sz / 1000;                 % sqrt(area) of the disc, m
+S.z   = dep / 1000;                % centre depth, m
+S.s   = defects.position(:) / 1000;
+S.ext = zeros(n, 1);               % crack extension Delta a
+S.id  = (1:n)';                    % original index
+S.dK  = zeros(n, 1);               % last nominal dK
 end

@@ -1,114 +1,64 @@
 classdef FlpmSolverTest < matlab.unittest.TestCase
     %FLPMSOLVERTEST  Crack-growth solver and fatigue-strength search.
-    %
-    %   Reference values marked "original code" were produced on 2026-11-18 by
-    %   running N. Macallister's Nasgro.m / multi_coalition_version3.m
-    %   (Feb 2025, 'Nic''s Model') with dKth,lc = 2.7 MPa*sqrt(m) and
-    %   flow stress 1150 MPa (Mater. Des. 2026, Table 2), i.e. the parameters
-    %   of flpm.material('Ti64-AB').
 
     properties
         mat
-        geom
-        single      % defect of the sanbox_multi single-defect case
-        multi       % five defects, two of which coalesce
+        single      % one near-surface pore
+        multi       % five pores, two of which touch
     end
 
     methods (TestMethodSetup)
         function setup(tc)
             tc.mat = flpm.material('Ti64-AB');
-            tc.geom = flpm.geometry();
-            tc.single = flpm.defectSet(0.055997925, 3.394247128, 2.544400909, 1);
+            tc.single = flpm.defectSet(0.056, 0.256, 0);
             tc.multi = flpm.defectSet([0.06 0.045 0.07 0.05 0.055], ...
-                [3.40 3.45 2.0 3.50 3.42], [0 0.03 1.5 -2 0.05], ...
-                [0.6 0.8 0.5 1 0.7]);
+                [0.25 0.20 1.65 0.15 0.23], [0 0.05 5 9 0.12]);
         end
     end
 
     methods (Test)
-        function legacyReproducesOriginalCycleCounts(tc)
-            o = flpm.modelOptions('legacy');
-            ref = [260 61200; 300 36700; 350 22000];          % original code
-            for k = 1:size(ref, 1)
-                r = flpm.fatigueLife(ref(k,1), tc.multi, tc.mat, tc.geom, o);
-                tc.verifyEqual(r.N, ref(k,2), sprintf('multi, %g MPa', ref(k,1)));
-                tc.verifyEqual(r.killer, 5);
-            end
-            r = flpm.fatigueLife(350, tc.single, tc.mat, tc.geom, o);
-            tc.verifyEqual(r.N, 89900);                         % original code
-            r = flpm.fatigueLife(300, tc.single, tc.mat, tc.geom, o);
-            tc.verifyEqual(r.N, Inf);                           % run-out
-        end
-
-        function legacyStrengthMatchesOriginalFminsearch(tc)
-            % original code: fminsearch from 400 MPa -> 315.703125 MPa
-            r = flpm.fatigueStrength(tc.single, tc.mat, tc.geom, flpm.modelOptions('legacy'));
-            tc.verifyEqual(r.stress, 315.703125, 'AbsTol', 1e-9);
-            tc.verifyTrue(r.converged);
-        end
-
-        function bracketAgreesWithLegacySolver(tc)
-            o = flpm.modelOptions('legacy', 'Stepping', 'adaptive', 'Eta', 0.005, ...
-                'Solver', 'bracket', 'MaxLife', 1.02e7);
-            r = flpm.fatigueStrength(tc.single, tc.mat, tc.geom, o);
-            tc.verifyTrue(r.converged);
-            tc.verifyEqual(r.stress, 315.703125, 'AbsTol', 0.5);
-            tc.verifyEqual(r.N, 1e7, 'RelTol', 0.02);
-        end
-
-        function adaptiveStepConverges(tc)
-            % Away from the threshold the adaptive scheme matches fine fixed
-            % stepping to better than 1 % (fixed-25 itself is ~0.2 % off).
-            of = flpm.modelOptions('paper', 'Stepping', 'fixed', 'FixedStep', 25);
-            oa = flpm.modelOptions('paper', 'Eta', 0.005);
+        function stepSizeConvergence(tc)
+            % halving Eta changes the life by < 0.5 %
             for s = [300 400]
-                rf = flpm.fatigueLife(s, tc.multi, tc.mat, tc.geom, of);
-                ra = flpm.fatigueLife(s, tc.multi, tc.mat, tc.geom, oa);
-                tc.verifyEqual(ra.N, rf.N, 'RelTol', 1e-2);
+                a = flpm.fatigueLife(s, tc.multi, tc.mat, flpm.options('Eta', 0.005));
+                b = flpm.fatigueLife(s, tc.multi, tc.mat, flpm.options('Eta', 0.0025));
+                if isfinite(b.N)
+                    tc.verifyEqual(a.N, b.N, 'RelTol', 5e-3);
+                end
             end
-            % near the strength (N ~ 8e6): same life, >10x fewer steps
-            % than the original fixed 100-cycle increments
-            rf = flpm.fatigueLife(322, tc.single, tc.mat, tc.geom, ...
-                flpm.modelOptions('paper', 'Stepping', 'fixed', 'MaxLife', 1e8));
-            ra = flpm.fatigueLife(322, tc.single, tc.mat, tc.geom, ...
-                flpm.modelOptions('paper', 'MaxLife', 1e8));
-            tc.verifyGreaterThan(rf.N, 1e6);
-            tc.verifyEqual(ra.N, rf.N, 'RelTol', 5e-3);
-            tc.verifyLessThan(ra.nSteps, rf.nSteps / 10);
         end
 
         function noGrowthBelowOnset(tc)
-            r = flpm.fatigueLife(50, tc.single, tc.mat, tc.geom, flpm.modelOptions());
+            r = flpm.fatigueLife(50, tc.single, tc.mat);
             tc.verifyEqual(r.N, Inf);
             tc.verifyEqual(r.status, 'noGrowth');
         end
 
+        function lifeDecreasesWithStress(tc)
+            N = arrayfun(@(s) flpm.fatigueLife(s, tc.multi, tc.mat).N, [350 400 500 600]);
+            tc.verifyTrue(all(diff(N(isfinite(N))) < 0));
+        end
+
         function strengthIsMonotonicInSize(tc)
-            o = flpm.modelOptions();
-            s = zeros(1, 3);
             sizes = [0.04 0.06 0.09];
-            for k = 1:3
-                d = flpm.defectSet(sizes(k), 3.65 - sizes(k), 0, 1);   % surface
-                s(k) = flpm.fatigueStrength(d, tc.mat, tc.geom, o).stress;
-            end
+            s = arrayfun(@(a) flpm.fatigueStrength(flpm.defectSet(a, 0.4, 0), tc.mat).stress, sizes);
             tc.verifyTrue(all(diff(s) < 0));
         end
 
-        function surfaceDefectIsMoreSevereThanCentre(tc)
-            % Acta Mater. 2022, Fig. 9: surface initiation lowers the
-            % strength relative to an equal defect at the centre.
-            o = flpm.modelOptions();
-            sc = flpm.fatigueStrength(flpm.defectSet(0.05, 0, 0, 1), tc.mat, tc.geom, o);
-            ss = flpm.fatigueStrength(flpm.defectSet(0.05, 3.60, 0, 1), tc.mat, tc.geom, o);
-            tc.verifyLessThan(ss.stress, sc.stress);
+        function strengthIncreasesWithDepth(tc)
+            % the same pore is less severe the deeper it lies (Acta Mater.
+            % 2022, Fig. 9)
+            depths = [0.02 0.06 0.5 2];
+            s = arrayfun(@(z) flpm.fatigueStrength(flpm.defectSet(0.05, z, 0), tc.mat).stress, depths);
+            tc.verifyTrue(all(diff(s) >= 0));
+            tc.verifyGreaterThan(s(end), s(1));
         end
 
         function bracketSolutionHitsTarget(tc)
-            r = flpm.fatigueStrength(tc.multi, tc.mat, tc.geom, flpm.modelOptions());
+            r = flpm.fatigueStrength(tc.multi, tc.mat);
             tc.verifyTrue(r.converged);
-            lo = flpm.fatigueLife(r.stress - 0.2, tc.multi, tc.mat, tc.geom, flpm.modelOptions());
+            lo = flpm.fatigueLife(r.stress - 0.2, tc.multi, tc.mat);
             if r.stepInSN
-                % N_f jumps at the strength: arrest just below it
                 tc.verifyGreaterThan(lo.N, 1e7);
             elseif ~r.onsetLimited
                 tc.verifyEqual(r.N, 1e7, 'RelTol', 0.02);
@@ -116,41 +66,37 @@ classdef FlpmSolverTest < matlab.unittest.TestCase
             end
         end
 
-        function plasticZoneFactorMatters(tc)
-            % pi/6 (code) vs 1/(6 pi) (Acta Eq. 12): larger rp -> shorter life
-            a = flpm.fatigueLife(300, tc.multi, tc.mat, tc.geom, ...
-                flpm.modelOptions('paper', 'PlasticZoneFactor', pi/6));
-            b = flpm.fatigueLife(300, tc.multi, tc.mat, tc.geom, flpm.modelOptions('paper'));
-            tc.verifyLessThan(a.N, b.N);
+        function failureByToughness(tc)
+            r = flpm.fatigueLife(600, tc.multi, tc.mat);
+            tc.verifyEqual(r.status, 'Kc');
+            tc.verifyTrue(isfinite(r.N));
         end
 
         function monteCarloSmoke(tc)
             pop = flpm.defectPopulation('volumetric', ...
                 'Size', makedist('Weibull', 'a', 0.06, 'b', 5), ...
-                'Depth', makedist('Exponential', 'mu', 0.4), ...
-                'Aspect', makedist('Uniform', 'lower', 0.4, 'upper', 1), ...
-                'Count', 6);
-            T = flpm.monteCarlo(pop, tc.mat, tc.geom, 'NumSimulations', 4, 'Seed', 2);
-            tc.verifySize(T, [4 16]);
-            tc.verifyTrue(all(isfinite(T.stress)));
+                'Depth', makedist('Exponential', 'mu', 0.4), 'Count', 6);
+            T = flpm.monteCarlo(pop, tc.mat, 'SurfaceLength', 22.9, ...
+                'NumSimulations', 4, 'Seed', 2);
+            tc.verifySize(T, [4 14]);
             tc.verifyTrue(all(T.stress > 50 & T.stress < 600));
-            T2 = flpm.monteCarlo(pop, tc.mat, tc.geom, 'NumSimulations', 4, 'Seed', 2);
+            T2 = flpm.monteCarlo(pop, tc.mat, 'SurfaceLength', 22.9, ...
+                'NumSimulations', 4, 'Seed', 2);
             tc.verifyEqual(T2.stress, T.stress);
         end
 
         function emptyThresholdedSetGivesDefectFreeStrength(tc)
             pop = flpm.defectPopulation('volumetric', 'Size', 0.01, ...
-                'Radius', 1, 'Count', 3, 'Threshold', 0.05);
-            T = flpm.monteCarlo(pop, tc.mat, tc.geom, 'NumSimulations', 2);
+                'Depth', 1, 'Count', 3, 'Threshold', 0.05);
+            T = flpm.monteCarlo(pop, tc.mat, 'SurfaceLength', 10, 'NumSimulations', 2);
             tc.verifyEqual(T.stress, [450; 450]);
             tc.verifyEqual(T.status, ["noDefects"; "noDefects"]);
         end
 
         function inputValidation(tc)
-            bad = flpm.defectSet(0.05, 4.0, 0, 1);              % outside the bar
-            tc.verifyError(@() flpm.fatigueLife(300, bad, tc.mat, tc.geom), ...
-                'flpm:defects:radius');
-            tc.verifyError(@() flpm.fatigueLife(-1, tc.single, tc.mat, tc.geom), ...
+            bad = flpm.defectSet(0.05, -0.1, 0);
+            tc.verifyError(@() flpm.fatigueLife(300, bad, tc.mat), 'flpm:defects:depth');
+            tc.verifyError(@() flpm.fatigueLife(-1, tc.single, tc.mat), ...
                 'flpm:fatigueLife:stress');
         end
     end

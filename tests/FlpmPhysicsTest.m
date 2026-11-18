@@ -4,96 +4,101 @@ classdef FlpmPhysicsTest < matlab.unittest.TestCase
 
     methods (Test)
         function newmanClosureRatio(tc)
-            % Value of the published closure function for Ti64-AB, R = 0.1.
-            U = flpm.internal.newmanU(0.1, 2.73, []);
+            U = flpm.internal.newmanU(0.1, 2.73);
             tc.verifyEqual(U, 0.782309004496420, 'AbsTol', 1e-12);
-            % Fully open for R close to 1 is not required, but U <= 1 always.
-            tc.verifyLessThanOrEqual(flpm.internal.newmanU(0.7, 2.73, []), 1);
+            tc.verifyLessThanOrEqual(flpm.internal.newmanU(0.7, 2.73), 1);
         end
 
-        function formanSmallCrackLimit(tc)
-            % a -> 0 recovers the semi-circular surface crack value ~0.657.
-            Y = flpm.internal.formanShaftY([1e-9 1e-6], 7.3e-3);
-            tc.verifyEqual(Y, 0.657144393828712*[1 1], 'RelTol', 1e-3);
-            % Monotonic increase and hold beyond D/2.
-            a = linspace(1e-5, 4e-3, 50);
-            Ya = flpm.internal.formanShaftY(a, 7.3e-3);
-            tc.verifyTrue(all(diff(Ya(a < 3.65e-3)) > 0));
-            tc.verifyEqual(Ya(end), flpm.internal.formanShaftY(3.65e-3, 7.3e-3), 'RelTol', 1e-12);
+        function murakamiInternalAndSurface(tc)
+            a = 0.05e-3;  r = a/sqrt(pi);
+            S = state([a a a], [1e-3, r, 0]);            % deep, touching, centred
+            [Y, A, cls] = flpm.internal.stressIntensity(S);
+            tc.verifyEqual(cls(:).', [0 2 2]);
+            tc.verifyEqual(Y(:).', [0.5 0.65 0.65]);
+            tc.verifyEqual(A(1), a, 'RelTol', 1e-12);
+            tc.verifyEqual(A(2), a, 'RelTol', 1e-12);        % whole disc below
+            tc.verifyEqual(A(3), a/sqrt(2), 'RelTol', 1e-12); % half disc
         end
 
-        function netSectionStressLimits(tc)
-            D = 7.3e-3;
-            tc.verifyEqual(flpm.internal.netSectionStress(1e-7, 100, D, 0.13), 100, 'RelTol', 1e-3);
-            a = linspace(1e-5, 3e-3, 40);
-            S = arrayfun(@(x) flpm.internal.netSectionStress(x, 100, D, 0.13), a);
-            tc.verifyTrue(all(diff(S) > 0), 'net-section stress must increase with crack depth');
-            % Linear in the remote stress.
-            tc.verifyEqual(flpm.internal.netSectionStress(1e-3, 300, D, 0.13), ...
-                3*flpm.internal.netSectionStress(1e-3, 100, D, 0.13), 'RelTol', 1e-12);
+        function nearSurfaceRuleAndContinuity(tc)
+            a = 0.05e-3;  r = a/sqrt(pi);
+            zc = r + r/0.8;                                % proximity limit
+            S = state([a a], [zc*(1-1e-9), zc*(1+1e-9)]);
+            [Y, A, cls] = flpm.internal.stressIntensity(S);
+            tc.verifyEqual(cls(:).', [1 0]);
+            tc.verifyEqual(A(1), sqrt(pi*r*(zc + r)/2), 'RelTol', 1e-6);
+            tc.verifyEqual(Y(1), 0.65);
+            % near-surface envelope equals the disc when it touches the surface
+            S = state(a, r*(1+1e-12));
+            [~, A] = flpm.internal.stressIntensity(S);
+            tc.verifyEqual(A, a, 'RelTol', 1e-9);
+        end
+
+        function surfaceAreaDecreasesAsCentreRises(tc)
+            a = 0.05e-3; r = a/sqrt(pi);
+            z = linspace(r, 0, 20);
+            [~, A] = flpm.internal.stressIntensity(state(a*ones(1,20), z));
+            tc.verifyTrue(all(diff(A) < 0));
+        end
+
+        function noSpecimenDimension(tc)
+            % lateral translation of the whole set leaves the life unchanged
+            mat = flpm.material('Ti64-AB');
+            d1 = flpm.defectSet([0.06 0.05], [0.2 0.25], [0 0.12]);
+            d2 = flpm.defectSet([0.06 0.05], [0.2 0.25], [0 0.12] + 1234.5);
+            r1 = flpm.fatigueLife(300, d1, mat);
+            r2 = flpm.fatigueLife(300, d2, mat);
+            tc.verifyEqual(r2.N, r1.N, 'RelTol', 1e-12);
         end
 
         function roughnessShieldingFactor(tc)
-            [YR, sa] = flpm.roughnessShielding(0.010, 0.100);   % a/2b = 0.1
+            [YR, sa] = flpm.roughnessShielding(0.010, 0.100);
             tc.verifyEqual(YR, 1.032170528546519, 'AbsTol', 1e-12);
             tc.verifyEqual(sa, 0.1*(2.97*0.1 - 3.51*0.01 - 9.74*0.001), 'AbsTol', 1e-15);
-            % Steep valleys: sqrt(areaR) = 0.38*2b.
             [~, sa2] = flpm.roughnessShielding(0.05, 0.1);
             tc.verifyEqual(sa2, 0.038, 'AbsTol', 1e-15);
-            % Vector Rv with scalar RSm.
             tc.verifySize(flpm.roughnessShielding([0.01 0.02 0.05], 0.1), [1 3]);
         end
 
-        function classificationAndInternalDamping(tc)
-            D = 7.3e-3; o = flpm.modelOptions();
-            S = state([0.05 0.05 0.05], [0 3.58 3.62], [0 pi/2 pi], [1 1 1]);
-            [Y, cls] = flpm.internal.geometryFactors(S, D, o, 1);
-            tc.verifyEqual(cls(:).', [0 1 2]);        % internal, near, surface
-            % Surface: Forman bounded below by the surface floor 1.0335.
-            tc.verifyEqual(Y(3), 1.0335, 'AbsTol', 1e-12);
-            % Internal Y carries the 0.5/0.65 factor relative to the raw value.
-            Yraw = flpm.internal.alegreEmbeddedY(S.a(1), 1, D/2 + S.a(1), D/2);
-            tc.verifyEqual(Y(1), 0.5/0.65*Yraw, 'RelTol', 1e-12);
-        end
-
-        function coalescenceMergesByEquivalentArea(tc)
-            % Two defects in contact (centre distance < a1 + a2).
-            S = state([0.06 0.04], [1.0 1.09], [0 0], [0.5 1]);
+        function coalescenceMergesByArea(tc)
+            a1 = 0.06e-3; a2 = 0.04e-3;
+            r = (a1 + a2)/sqrt(pi);
+            S = state([a1 a2], [0.5e-3 0.5e-3], [0 0.9*r]);
             S.ext = [2e-6; 5e-6];
             S.dK = [2; 1];
-            [M, merged] = flpm.internal.coalesce(S, 1);
+            [M, merged] = flpm.internal.coalesce(S);
             tc.verifyTrue(merged);
             tc.verifyNumElements(M.a, 1);
-            tc.verifyEqual(M.a, hypot(0.06, 0.04)/1000, 'RelTol', 1e-12);
-            tc.verifyEqual(M.x, (0.06*1.0 + 0.04*1.09)/0.10/1000, 'RelTol', 1e-12);
-            tc.verifyEqual(M.asp, (0.06*0.5 + 0.04*1)/0.10, 'RelTol', 1e-12);
+            tc.verifyEqual(M.a, hypot(a1, a2), 'RelTol', 1e-12);
+            tc.verifyEqual(M.s, a2^2*0.9*r/(a1^2 + a2^2), 'RelTol', 1e-12);
             tc.verifyEqual(M.ext, 5e-6);
-            tc.verifyEqual(M.id, 1);                     % member with max dK
+            tc.verifyEqual(M.id, 1);
         end
 
         function coalescenceIsTransitive(tc)
-            % A touches B, B touches C, A does not touch C -> one defect.
-            S = state([0.05 0.05 0.05], [0 0.09 0.18], [0 0 0], [1 1 1]);
+            a = 0.05e-3; d = 1.9*a/sqrt(pi);
+            S = state([a a a], [1e-3 1e-3 1e-3], [0 d 2*d]);
             S.dK = [1; 3; 2];
-            M = flpm.internal.coalesce(S, 1);
+            M = flpm.internal.coalesce(S);
             tc.verifyNumElements(M.a, 1);
             tc.verifyEqual(M.id, 2);
-            tc.verifyEqual(M.a, sqrt(3)*0.05e-3, 'RelTol', 1e-12);
+            tc.verifyEqual(M.a, sqrt(3)*a, 'RelTol', 1e-12);
         end
 
         function noCoalescenceWhenApart(tc)
-            S = state([0.05 0.05], [0 0.2], [0 0], [1 1]);
-            [M, merged] = flpm.internal.coalesce(S, 1);
+            a = 0.05e-3;
+            S = state([a a], [1e-3 1e-3], [0 3*a]);
+            [M, merged] = flpm.internal.coalesce(S);
             tc.verifyFalse(merged);
             tc.verifyNumElements(M.a, 2);
         end
     end
 end
 
-function S = state(sizeMm, xMm, ang, asp)
-% Defects placed along the x axis at the given radial distances.
-geom = flpm.geometry();
-d = flpm.defectSet(sizeMm, abs(xMm), ang, asp);
-S = flpm.internal.prepareState(d, geom);
-S.dK = zeros(size(S.a));
+function S = state(a, z, s)
+% Solver state (SI) from vectors of sqrt(area), depth and position.
+if nargin < 3, s = zeros(size(a)); end
+n = numel(a);
+S = struct('a', a(:), 'z', z(:), 's', s(:), 'ext', zeros(n,1), ...
+    'id', (1:n)', 'dK', zeros(n,1));
 end
