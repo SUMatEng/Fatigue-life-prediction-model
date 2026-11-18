@@ -11,11 +11,20 @@ The 600 defect sets behind [M] Table 5 were converted once from polar
 coordinates in the 7.3 mm bars to depth below the surface and arc length
 along it. Results are median and interquartile range, in MPa:
 
-| Volume | Published [M] | 2025 code, D = 7.3 mm, paper fixes | Current model |
-|---|---|---|---|
-| 1 (9 defects) | 222 (159–262) | 262 (245–283) | 303 (286–311) |
-| 2 (12 defects) | 180 (149–203) | 238 (214–252) | 274 (261–284) |
-| 3 (15 defects) | 158 (143–186) | 221 (203–246) | 278 (264–282) |
+| Volume | Published [M] | 2025 code, D = 7.3 mm, paper fixes | Contact-only coalescence | BS 7910, one plane | BS 7910, axial spread 2 mm |
+|---|---|---|---|---|---|
+| 1 (9 defects) | 222 (159–262) | 262 (245–283) | 303 (286–311) | 292 (268–309) | 305 (287–311) |
+| 2 (12 defects) | 180 (149–203) | 238 (214–252) | 274 (261–284) | 257 (230–279) | 278 (265–285) |
+| 3 (15 defects) | 158 (143–186) | 221 (203–246) | 278 (264–282) | 259 (239–277) | 279 (269–284) |
+
+* The current model uses BS 7910 interaction (MODEL.md). The simulated XCT
+  sets hold no axial coordinate, so "one plane" is how they are evaluated by
+  default. That case is the upper bound on interaction. The last column
+  gives the same sets random axial positions over 2 mm (seed 7). The
+  results for 5 mm and 10 mm are the same within 1 MPa.
+* With every defect in one plane, BS 7910 changes 60, 94 and 125 of the 200
+  strengths per volume, by up to 133 MPa. Once the defects are spread
+  along the axis, interaction almost disappears.
 
 * All 600 sets converge, in about 0.5 s per set.
 * **Every strength is a crack-arrest step.** Just below Δσ_w all cracks

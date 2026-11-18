@@ -41,6 +41,10 @@ median(T.stress)
 
 The model needs no specimen dimension. `SurfaceLength` is only the amount
 of free surface one simulation represents, i.e. the statistical sample size.
+`'AxialLength'` (gauge length, mm) spreads defects along the load axis.
+Flaw interaction then follows the BS 7910 rules in 3D, and
+`'CountPerArea'` gives the count per mm² of surface. A measured set takes
+axial positions with `flpm.defectSet(size, depth, position, 'Axial', y)`.
 
 ## Main functions
 

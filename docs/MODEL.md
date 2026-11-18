@@ -6,13 +6,17 @@ switches for alternative physics; `flpm.options` holds only the loading
 
 ## Defects
 
-Each defect is a disc in the plane normal to the load:
+Each defect is idealised as a circular disc normal to the load (a pore
+seen in projection on that plane):
 
 * `size`: √area of the whole defect (mm). The equivalent-circle radius is
   r = √area/√π.
 * `depth`: depth of its centre below the free surface (mm, ≥ 0).
 * `position`: position of its centre along the free surface (mm). Only
   relative positions matter.
+* `axial` (optional): position along the load axis (mm). If it is absent,
+  all defects lie in one plane, which is the most severe case for
+  interaction.
 
 ## Stress intensity (Murakami √area, half-space)
 
@@ -50,10 +54,57 @@ F     = 1 − (1 − U^m)(1 − e^(−Δa/l))
 * Once ΔK ≤ ΔKth the crack is arrested: it does not grow. The 1e-12 m/cycle
   creep of the 2023–2025 code is not used.
 
-## Interaction and termination
+## Flaw interaction (BS 7910 rules)
 
-* Discs that touch coalesce. Areas add, the centre is the area-weighted
-  centroid, and the merged crack takes the largest member extension.
+Interaction is decided in 3D with the BS 7910 flaw-interaction rules,
+applied at every step, so that cracks that grow into interaction are
+combined. Each defect is treated as a circular flaw of length l = 2r and
+height 2a = 2r (r = √area/√π).
+
+1. **Alignment (non-coplanar flaws).** Two flaws in planes H apart, with
+   in-plane gap g between their projections, are treated as coplanar when
+   √(H² + g²) ≤ 0.5 (l₁ + l₂). Otherwise they do not interact.
+2. **Combination (in the plane of projection).** With the containment
+   rectangles of the projections:
+   * overlapping projections interact;
+   * side by side (overlapping in depth, gap s along the surface):
+     s ≤ min(l₁, l₂);
+   * stacked (overlapping along the surface, gap s in depth):
+     s ≤ a₁ + a₂ (sum of half-heights);
+   * flaws that are offset diagonally do not interact.
+3. **Re-characterisation.** Interacting flaws are replaced by the rectangle
+   that contains them, idealised as its inscribed ellipse (half-axes c, h).
+   This is stored as an equal-area flaw, √area = √(π c h), at the centre
+   of the rectangle, so that Murakami's √area and Y rules
+   (above) apply to it unchanged. Its axial position is the area-weighted
+   mean of the members. The merged crack takes the largest member
+   extension, and the member with the largest ΔK names it.
+
+Interaction is transitive: chains of pairwise-interacting flaws are
+combined in one step, and the result is checked again until no pair
+interacts.
+
+**Sources and status.** The BS 7910 text itself was not consulted. The
+rules above follow secondary sources:
+
+* Kim (2007), Key Eng. Mater. 345–346, 411,
+  doi:10.4028/www.scientific.net/KEM.345-346.411: alignment
+  D ≤ 0.5(l₁ + l₂) and combination limits s ≤ min(l₁, l₂), s ≤ a₁ + a₂.
+* TWI, overview of BS 7910:2013 and the history of its interaction
+  criteria (twi-global.com). For surface flaws, the 2013 edition replaced
+  "s = 0" with s ≤ 0.5 max(a₁, a₂), which is not used here because the
+  half-space treatment of near-surface flaws is Murakami's.
+* ORNL report on AM round bars, doi:10.2172/1985290. For porosity in AM
+  bars, BS 7910 / ASME XI combination is conservative, with ~40% higher K
+  from the bounding flaw. The report suggests s ≤ a_min instead.
+
+Points to confirm against BS 7910:2019: the exact form of the alignment
+and combination limits, and the rule for an embedded flaw near the free
+surface. The latter is handled by Murakami's proximity rule (above), not
+by BS 7910.
+
+## Termination
+
 * Failure is Kmax = ΔK/(1 − R) ≥ K_IC. There is no net-section criterion,
   since that needs a cross-section.
 * A run-out is either arrest of every crack, or N > 1.02 × the target life.
@@ -72,4 +123,6 @@ F     = 1 − (1 − U^m)(1 − e^(−Δa/l))
 `SurfaceLength` (mm) is the free-surface length that one Monte Carlo
 simulation represents (πD for a round bar). It sets the defect count of
 `CountPerLength` populations and the range of positions along the
-surface. It is a sample size, not a geometry input to K.
+surface. It is a sample size, not a geometry input to K. `AxialLength`
+(mm) spreads defects along the load axis (3D sampling). `CountPerArea`
+populations take CountPerArea × SurfaceLength × AxialLength defects.
