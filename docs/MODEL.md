@@ -54,58 +54,112 @@ F     = 1 − (1 − U^m)(1 − e^(−Δa/l))
 * Once ΔK ≤ ΔKth the crack is arrested: it does not grow. The 1e-12 m/cycle
   creep of the 2023–2025 code is not used.
 
-## Flaw interaction (BS 7910 rules)
+## Flaw interaction (continuous interaction factor, link-up on contact)
 
-Interaction is decided in 3D with the BS 7910 flaw-interaction rules,
-applied at every step, so that cracks that grow into interaction are
-combined. Each defect is treated as a circular flaw of length l = 2r and
-height 2a = 2r (r = √area/√π).
+Each defect is the equivalent penny crack of radius r = √area/√π in the
+plane normal to the load, centred at (position, depth, axial). Two
+mechanisms act at every increment.
 
-1. **Alignment (non-coplanar flaws).** Two flaws in planes H apart, with
-   in-plane gap g between their projections, are treated as coplanar when
-   √(H² + g²) ≤ 0.5 (l₁ + l₂). Otherwise they do not interact.
-2. **Combination (in the plane of projection).** With the containment
-   rectangles of the projections:
-   * overlapping projections interact;
-   * side by side (overlapping in depth, gap s along the surface):
-     s ≤ min(l₁, l₂);
-   * stacked (overlapping along the surface, gap s in depth):
-     s ≤ a₁ + a₂ (sum of half-heights);
-   * flaws that are offset diagonally do not interact.
-3. **Re-characterisation.** Interacting flaws are replaced by the rectangle
-   that contains them, idealised as its inscribed ellipse (half-axes c, h).
-   This is stored as an equal-area flaw, √area = √(π c h), at the centre
-   of the rectangle, so that Murakami's √area and Y rules
-   (above) apply to it unchanged. Its axial position is the area-weighted
-   mean of the members. The merged crack takes the largest member
-   extension, and the member with the largest ΔK names it.
+**1. Interaction (K amplification or shielding).** Every crack's ΔK is
+multiplied by its interaction factor γ ≥ 0, which follows continuously
+from the spacing, size ratio and offset of its neighbours. γ is computed
+with Kachanov's method of average tractions (Kachanov, Int. J. Solids
+Struct. 23 (1987) 23; Kachanov & Laures, Int. J. Fract. 41 (1989) 289):
 
-Interaction is transitive: chains of pairwise-interacting flaws are
-combined in one step, and the result is checked again until no pair
-interacts.
+```
+p_i = 1 + Σ_j Λ_ij p_j,     Λ_ij = ⟨σ̂_j⟩ over crack i
+t_i(P) = 1 + Σ_j p_j σ̂_j(P)          (traction on crack i)
+K_i(Q) = 1/(π√(πr)) ∫ t_i(P) √(r² − ρ_P²)/|PQ|² dA      (Galin; Kassir & Sih)
+γ_i = max_Q K_i(Q) / K_i,alone
+```
 
-**Sources and status.** The BS 7910 text itself was not consulted. The
-rules above follow secondary sources:
+σ̂_j is the exact normal stress of a penny crack under unit pressure
+(Sneddon's closed form, `flpm.internal.pennyStress`, checked against
+numerical Hankel integration to 5 digits). The weight-function integral is
+evaluated with its singularity subtracted (the kernel integrates to 2π r)
+on a 32 × 64 area-uniform grid at 24 front points.
 
-* Kim (2007), Key Eng. Mater. 345–346, 411,
-  doi:10.4028/www.scientific.net/KEM.345-346.411: alignment
-  D ≤ 0.5(l₁ + l₂) and combination limits s ≤ min(l₁, l₂), s ≤ a₁ + a₂.
-* TWI, overview of BS 7910:2013 and the history of its interaction
-  criteria (twi-global.com). For surface flaws, the 2013 edition replaced
-  "s = 0" with s ≤ 0.5 max(a₁, a₂), which is not used here because the
-  half-space treatment of near-surface flaws is Murakami's.
-* ORNL report on AM round bars, doi:10.2172/1985290. For porosity in AM
-  bars, BS 7910 / ASME XI combination is conservative, with ~40% higher K
-  from the bounding flaw. The report suggests s ≤ a_min instead.
+| Configuration (equal cracks) | γ (this code) | Note |
+|---|---|---|
+| coplanar, edge gap 0.1 r | 1.29 | converged reference 1.292 |
+| coplanar, edge gap 0.5 r | 1.06 | converged reference 1.064 |
+| coaxial (stacked), 0.25 r apart | 0.74 | shielding; reference 0.744 |
+| coaxial, 1 r apart | 0.83 | shielding |
+| edge gap > 4 (r₁ + r₂) | 1 | cut-off, amplification < ~1 % |
 
-Points to confirm against BS 7910:2019: the exact form of the alignment
-and combination limits, and the rule for an embedded flaw near the free
-surface. The latter is handled by Murakami's proximity rule (above), not
-by BS 7910.
+The "converged reference" values are from the same formulation on a
+4-times finer grid. **Calibration against independent published SIF
+solutions is pending:** the tabulated results of Kachanov & Laures (1989)
+and of the boundary-element studies on coplanar and stacked penny cracks
+were not accessible (paywalled). The qualitative behaviour (amplification
+in the plane, shielding when stacked) is the established one. The method
+is known to be accurate to a few percent down to gaps of about 0.1 r and
+to under-predict the amplification at smaller gaps.
+
+γ is re-evaluated whenever any crack has grown by more than 1 % since the
+last evaluation.
+
+**2. Link-up (coalescence).** Cracks are combined only when their
+projections on the plane normal to the load touch and their planes are
+aligned (the BS 7910 alignment rule, H ≤ 0.5 (l₁ + l₂) with l = 2r). The
+linked crack is re-characterised as in BS 7910: the rectangle containing
+both projections, idealised as its inscribed ellipse (half-axes c, h), and
+stored as the equal-area crack √area = √(π c h) at the centre of the
+rectangle. It takes the largest member extension; the member with the
+largest ΔK names it. Link-up is transitive.
+
+This replaces the earlier binary BS 7910 combination rules (s ≤ min(l₁, l₂)
+side by side, s ≤ a₁ + a₂ stacked), which merge cracks across a gap and
+are known to be conservative for AM porosity (ORNL, doi:10.2172/1985290,
+~40 % higher K from the bounding flaw). The interaction across a gap is now
+the computed γ.
+
+**Limitations (to confirm).**
+
+* The free surface is not included in the interaction. It enters only
+  through Murakami's Y and A of each crack. A near-surface pair is
+  therefore treated as in an infinite body, and the front points above
+  the surface are not excluded from the maximum.
+* Surface roughness valleys are surface discs in the same set, so the
+  roughness–pore interaction enters through γ and link-up, with the same
+  caveat.
+* Cracks are taken as flat discs normal to the load. Tilted pores enter
+  through their projected area (`flpm.projectedArea`), not their tilt.
+
+## Residual stress (local mean-stress shift)
+
+`flpm.options('ResidualStress', @(z) ...)` gives the residual stress
+normal to the crack plane (MPa, tensile positive) as a function of depth
+z (mm). At a defect centred at depth z:
+
+```
+Kmax = (σ_max + σ_res(z)) Y √(π A),   R_loc = (σ_min + σ_res)/(σ_max + σ_res)
+```
+
+The range ΔK is unchanged. Closure uses U(R_loc). The plastic zone uses
+the local Kmax, and the K_IC check also uses it. A crack with
+σ_max + σ_res ≤ 0 is closed throughout the cycle and does not grow. The
+residual stress is evaluated at the defect centre: there is no gradient
+over the crack and no relaxation. It is a hook for measured profiles
+(e.g. hole drilling or XRD after machining or shot peening). Whether a
+superposition through R alone is adequate for LPBF Ti-6Al-4V needs your
+confirmation.
+
+## Projected area from XCT morphology
+
+`flpm.projectedArea` returns Murakami's √area on the plane normal to the
+maximum principal stress n. It has two forms:
+
+* From the three XCT projections (Ayz, Axz, Axy), taking the aligned
+  ellipsoid with those projections:
+  A(n) = √((n_x Ayz)² + (n_y Axz)² + (n_z Axy)²). This is exact for any
+  shape when n is a scan axis.
+* From the equivalent ellipsoid (semi-axes and principal directions):
+  A(n) = π a b c √(nᵀ M n), with M = Q diag(a⁻², b⁻², c⁻²) Qᵀ.
 
 ## Termination
 
-* Failure is Kmax = ΔK/(1 − R) ≥ K_IC. There is no net-section criterion,
+* Failure is Kmax ≥ K_IC (Kmax = ΔK/(1 − R), shifted by any residual stress). There is no net-section criterion,
   since that needs a cross-section.
 * A run-out is either arrest of every crack, or N > 1.02 × the target life.
 

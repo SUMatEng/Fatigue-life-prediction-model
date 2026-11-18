@@ -42,7 +42,8 @@ median(T.stress)
 The model needs no specimen dimension. `SurfaceLength` is only the amount
 of free surface one simulation represents, i.e. the statistical sample size.
 `'AxialLength'` (gauge length, mm) spreads defects along the load axis.
-Flaw interaction then follows the BS 7910 rules in 3D, and
+Flaws interact in 3D through a continuous K interaction factor and link
+up when their projections touch (see docs/MODEL.md), and
 `'CountPerArea'` gives the count per mm² of surface. A measured set takes
 axial positions with `flpm.defectSet(size, depth, position, 'Axial', y)`.
 
@@ -58,6 +59,7 @@ axial positions with `flpm.defectSet(size, depth, position, 'Axial', y)`.
 | `flpm.fatigueStrength` | Stress range giving the target life |
 | `flpm.monteCarlo` | Strength distribution and killer-defect statistics |
 | `flpm.roughnessShielding` | Y_R and √area_R from Rv and RSm |
+| `flpm.projectedArea` | √area on the plane normal to the load, from XCT projections or an ellipsoid |
 | `flpm.arrestMap`, `flpm.weakestLink` | Closed-form strength distribution P_s = exp(−Λ), stress fields, killer probabilities |
 | `flpm.fitSN`, `flpm.compareSN` | Random fatigue-limit S–N fit (censored run-outs); test of the predicted limit |
 | `flpm.killerDistribution` | Predicted killer size/depth, KS tests vs fractography |
