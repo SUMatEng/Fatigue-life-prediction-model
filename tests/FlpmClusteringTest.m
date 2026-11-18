@@ -54,12 +54,12 @@ classdef FlpmClusteringTest < matlab.unittest.TestCase
             k = poissinv(rand(rs, np, 1), mu);
             X = repelem(P, k, 1) + sig * randn(rs, sum(k), 2);
             X = X(all(X >= 0 & X <= Lb, 2), :);
-            f = flpm.fitClustering(X, 'Box', [0 0; Lb Lb], 'RMax', 1, 'NumSimulations', 19);
+            f = flpm.fitClustering(X, 'Box', [0 0; Lb Lb], 'RMax', 1, 'NumSimulations', 99);
             tc.verifyEqual(f.kappa, kappa, 'RelTol', 0.3);
             tc.verifyEqual(f.mu, mu, 'RelTol', 0.3);
             tc.verifyEqual(f.sigma, sig, 'RelTol', 0.2);
             tc.verifyGreaterThan(f.pThomas, 0.05);
-            tc.verifyLessThan(f.pPoisson, 0.06);
+            tc.verifyLessThan(f.pPoisson, 0.05);
         end
 
         function poissonDataGivesWeakClustering(tc)
@@ -67,7 +67,8 @@ classdef FlpmClusteringTest < matlab.unittest.TestCase
             X = 10 * rand(rs, 400, 2);
             f = flpm.fitClustering(X, 'Box', [0 0; 10 10], 'RMax', 1.5, 'NumSimulations', 19);
             % K of CSR: the cluster term is negligible over the fitted range
-            tc.verifyLessThan(max(abs(f.K.Khat - pi * f.K.r.^2) ./ (pi * f.K.r.^2)), 0.25);
+            big = f.K.r >= 0.5;
+            tc.verifyLessThan(max(abs(f.K.Khat(big) - pi * f.K.r(big).^2) ./ (pi * f.K.r(big).^2)), 0.15);
             tc.verifyGreaterThan(f.pPoisson, 0.05);
         end
 
