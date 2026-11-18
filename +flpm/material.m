@@ -24,6 +24,15 @@ function mat = material(name, varargin)
 %                     (lognormal, median dKth_lc); 0 = deterministic    [0]
 %                     It also scatters the closure length l, which
 %                     follows from dKth_lc through the El Haddad length.
+%       sealed        growth constants of cracks that do not break the
+%                     free surface (internal environment: vacuum-like, or
+%                     the build gas in the pore), as a struct with any of
+%                     C1, dKth_eff, dKth_lc, closure (false: U = 1);
+%                     missing fields and [] = the
+%                     values above (no environment effect)            [[]]
+%                     Calibrate it from vacuum or internal-crack data with
+%                     flpm.fitGrowthLaw. UNVERIFIED for PBF-LB: see
+%                     docs/MODEL.md, Finite life.
 %
 %   See also flpm.options.
 
@@ -52,5 +61,5 @@ end
 function mat = base(name, C1, p, m, alpha, dKlc, dKeff, dSe, KIC, s0)
 mat = struct('name', name, 'C1', C1, 'p', p, 'm', m, 'alpha', alpha, ...
     'dKth_lc', dKlc, 'dKth_eff', dKeff, 'dSigma_e', dSe, 'KIC', KIC, ...
-    'sigma0', s0, 'dKth_cov', 0);
+    'sigma0', s0, 'dKth_cov', 0, 'sealed', []);
 end

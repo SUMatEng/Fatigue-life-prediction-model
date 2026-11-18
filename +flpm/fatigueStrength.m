@@ -96,5 +96,6 @@ S.dK = Y .* sqrt(pi * A);
 S = flpm.internal.coalesce(S);
 [Y, A] = flpm.internal.stressIntensity(S);
 Y = Y .* flpm.internal.interactionFactor(S);
-s = min(mat.dKth_eff ./ (Y .* sqrt(pi * A))) * (1 + 1e-9);
+[~, dKe] = flpm.internal.growthParameters(S, mat);
+s = min(dKe ./ (Y .* sqrt(pi * A))) * (1 + 1e-9);
 end

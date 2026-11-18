@@ -141,13 +141,16 @@ dK = s * Y .* sqrt(pi * A);
 rp = c.rpFactor * (dK .* kmax / mat.sigma0).^2;
 dKg = s * Y .* sqrt(pi * (A + rp));
 decay = exp(-S.ext / c.l);
-dKth = mat.dKth_eff + (mat.dKth_lc - mat.dKth_eff) * (1 - decay);
+[C1, dKe, dKl, noCl] = flpm.internal.growthParameters(S, mat);
+U = U .* ones(size(S.a));
+U(noCl) = 1;
+dKth = dKe + (dKl - dKe) .* (1 - decay);
 F1 = 1 - (1 - U.^mat.m) .* (1 - decay);
 F2 = 1 - (1 - U) .* (1 - decay);
-active = F2 .* dK >= mat.dKth_eff & isOpen;
+active = F2 .* dK >= dKe & isOpen;
 rate = zeros(size(S.a));
 g = active & dKg > dKth;
-rate(g) = mat.C1 * F1(g) .* dKg(g).^(mat.m - mat.p) .* (dKg(g) - dKth(g)).^mat.p;
+rate(g) = C1(g) .* F1(g) .* dKg(g).^(mat.m - mat.p) .* (dKg(g) - dKth(g)).^mat.p;
 end
 
 function [kmax, U, isOpen] = local(S, c, s)
