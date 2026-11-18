@@ -62,7 +62,7 @@ while true
     Y = Y .* gam;                      % interaction amplifies or shields K
     S.dK = s * Y .* sqrt(pi * A);
 
-    if max(S.dK) / (1 - c.R) >= mat.KIC
+    if max(S.dK .* local(S, c, s)) >= mat.KIC
         status = 'Kc';
         break
     end
@@ -119,6 +119,8 @@ function c = constants(mat, opts)
 k = flpm.internal.constants();
 c.R = opts.LoadRatio;
 c.U = flpm.internal.newmanU(c.R, mat.alpha);
+c.alpha = mat.alpha;
+c.res = opts.ResidualStress;
 a0  = (1/pi) * (mat.dKth_lc  / (k.Ysurface * mat.dSigma_e))^2;   % El Haddad
 a0e = (1/pi) * (mat.dKth_eff / (k.Ysurface * mat.dSigma_e))^2;
 c.l = a0 - a0e;
@@ -129,16 +131,33 @@ end
 function [rate, active] = growthRates(S, Y, A, s, c, mat)
 % NASGRO / Maierhofer growth rate of every defect (m/cycle).
 dK = s * Y .* sqrt(pi * A);
-rp = c.rpFactor * (dK / (1 - c.R) / mat.sigma0).^2;
+[kmax, U, isOpen] = local(S, c, s);
+rp = c.rpFactor * (dK .* kmax / mat.sigma0).^2;
 dKg = s * Y .* sqrt(pi * (A + rp));
 decay = exp(-S.ext / c.l);
 dKth = mat.dKth_eff + (mat.dKth_lc - mat.dKth_eff) * (1 - decay);
-F1 = 1 - (1 - c.U^mat.m) * (1 - decay);
-F2 = 1 - (1 - c.U) * (1 - decay);
-active = F2 .* dK >= mat.dKth_eff;
+F1 = 1 - (1 - U.^mat.m) .* (1 - decay);
+F2 = 1 - (1 - U) .* (1 - decay);
+active = F2 .* dK >= mat.dKth_eff & isOpen;
 rate = zeros(size(S.a));
 g = active & dKg > dKth;
 rate(g) = mat.C1 * F1(g) .* dKg(g).^(mat.m - mat.p) .* (dKg(g) - dKth(g)).^mat.p;
+end
+
+function [kmax, U, isOpen] = local(S, c, s)
+% Kmax/dK, closure ratio and open flag of every defect. Without residual
+% stress these are the nominal 1/(1-R) and U(R).
+if isempty(c.res)
+    kmax = ones(size(S.a)) / (1 - c.R); U = c.U; isOpen = true(size(S.a));
+    return
+end
+smax = s / (1 - c.R);
+sr = c.res(S.z * 1e3);
+sr = sr(:) .* ones(size(S.a));
+isOpen = smax + sr > 0;
+kmax = max(smax + sr, 0) / s;
+Rl = (smax * c.R + sr) ./ max(smax + sr, eps);
+U = flpm.internal.newmanU(min(Rl, 0.99), c.alpha);
 end
 
 function dN = stepSize(S, rate, cls, c, opts)

@@ -128,6 +128,45 @@ classdef FlpmPhysicsTest < matlab.unittest.TestCase
             tc.verifyEqual(flpm.internal.interactionFactor(S2), flpm.internal.interactionFactor(S), 'RelTol', 1e-9);
         end
 
+        function newmanVectorised(tc)
+            R = [-1 -0.2 0 0.1 0.5 0.8];
+            U = flpm.internal.newmanU(R, 2.73);
+            for k = 1:numel(R)
+                if R(k) > 0, f = 0.2; else, f = 0.3; end
+                tc.verifyEqual(U(k), flpm.internal.newmanU(R(k), 2.73, f), 'RelTol', 1e-12);
+            end
+        end
+
+        function projectedAreaForms(tc)
+            r = 0.1;                                       % sphere
+            P = pi * r^2 * [1 1 1];
+            tc.verifyEqual(flpm.projectedArea('Projections', P, 'Normal', [1 2 3]), sqrt(pi)*r, 'RelTol', 1e-12);
+            e = [0.3 0.1 0.05];                            % aligned ellipsoid
+            P = pi * [e(2)*e(3), e(1)*e(3), e(1)*e(2)];
+            tc.verifyEqual(flpm.projectedArea('Projections', P), sqrt(P(3)), 'RelTol', 1e-12);
+            n = [0.3 -0.5 0.8];
+            tc.verifyEqual(flpm.projectedArea('Ellipsoid', e, 'Normal', n), ...
+                flpm.projectedArea('Projections', P, 'Normal', n), 'RelTol', 1e-12);
+            % rotating the ellipsoid and the normal together changes nothing
+            Q = expm([0 -0.4 0.2; 0.4 0 -0.7; -0.2 0.7 0]);
+            tc.verifyEqual(flpm.projectedArea('Ellipsoid', e, 'Axes', Q, 'Normal', (Q*n')'), ...
+                flpm.projectedArea('Ellipsoid', e, 'Normal', n), 'RelTol', 1e-12);
+            % long axis along the load: the smallest silhouette
+            tc.verifyEqual(flpm.projectedArea('Ellipsoid', e, 'Normal', [1 0 0]), sqrt(pi*e(2)*e(3)), 'RelTol', 1e-12);
+        end
+
+        function residualStressShiftsMeanStress(tc)
+            mat = flpm.material('Ti64-AB');
+            d = flpm.defectSet(0.06, 0.03, 0);             % near-surface pore
+            s0 = flpm.fatigueStrength(d, mat, flpm.options()).stress;
+            z0 = flpm.fatigueStrength(d, mat, flpm.options('ResidualStress', @(z) 0*z)).stress;
+            tc.verifyEqual(z0, s0, 'AbsTol', 0.06);
+            sc = flpm.fatigueStrength(d, mat, flpm.options('ResidualStress', @(z) -200 + 0*z)).stress;
+            st = flpm.fatigueStrength(d, mat, flpm.options('ResidualStress', @(z) 200 + 0*z)).stress;
+            tc.verifyGreaterThan(sc, s0);                  % compression helps
+            tc.verifyLessThan(st, s0);                     % tension hurts
+        end
+
         function noCoalescenceWhenApart(tc)
             a = 0.05e-3;
             S = state([a a], [1e-3 1e-3], [0 3*a]);
