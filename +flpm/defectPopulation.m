@@ -40,9 +40,14 @@ function pop = defectPopulation(type, varargin)
 %     'ShieldingFactor' surface: Y_R of the roughness valleys, defined with
 %                       the valley depth, K = Y_R s sqrt(pi Rv)
 %                       (flpm.roughnessShielding); 1.12 = unshielded notch [1.12]
+%     'Clustering'      flpm.clustering(...) or a fit from
+%                       flpm.fitClustering: Thomas cluster process for the
+%                       locations; the count stays the mean total number of
+%                       defects. [] = independent (Poisson) locations     [[]]
 %     'Name'            label                                           [type]
 %
-%   See also flpm.samplePopulation, flpm.monteCarlo, flpm.roughnessShielding.
+%   See also flpm.samplePopulation, flpm.monteCarlo, flpm.roughnessShielding,
+%   flpm.clustering, flpm.fitClustering.
 
 type = validatestring(type, {'volumetric', 'surface'});
 ip = inputParser;
@@ -58,6 +63,7 @@ ip.addParameter('Threshold', [], @(x) isempty(x) || (isscalar(x) && x >= 0));
 ip.addParameter('SizeBounds', [1e-6 Inf]);
 ip.addParameter('DepthBounds', [0 Inf]);
 ip.addParameter('ShieldingFactor', 1.12, @(x) isscalar(x) && x > 0);
+ip.addParameter('Clustering', []);
 ip.addParameter('Name', type);
 ip.parse(varargin{:});
 r = ip.Results;
@@ -83,6 +89,16 @@ pop.countPerLength = r.CountPerLength;
 pop.countPerArea = r.CountPerArea;
 pop.countModel = validatestring(r.CountModel, {'fixed', 'poisson'});
 pop.threshold = r.Threshold;
+pop.clustering = [];
+if ~isempty(r.Clustering)
+    c = r.Clustering;
+    if isstruct(c) && isfield(c, 'clustering'), c = c.clustering; end
+    if ~(isstruct(c) && isfield(c, 'type') && strcmp(c.type, 'thomas'))
+        error('flpm:population:clustering', ...
+            '''Clustering'' must come from flpm.clustering or flpm.fitClustering.');
+    end
+    pop.clustering = c;
+end
 switch type
     case 'volumetric'
         if isempty(r.Depth)
