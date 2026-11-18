@@ -86,6 +86,27 @@ comes almost entirely from BS 7910 interaction. Most of it appears as soon
 as clusters of three form.
 
 
+### Weakest link vs Monte Carlo (18 Nov 2026)
+
+[M] sets resampled (pooled size and depth, fixed count, SurfaceLength
+22.9 mm, AxialLength 2 mm). The table gives the 10/25/50/75/90% quantiles
+of strength in MPa:
+
+| Volume | Closed form (no interaction) | Monte Carlo (BS 7910, 3D) |
+|---|---|---|
+| 1 | 261 / 290 / 304 / 312 / 319 | 265 / 288 / 304 / 312 / 318 |
+| 2 | 224 / 264 / 277 / 284 / 290 | 227 / 267 / 279 / 285 / 292 |
+| 3 | 261 / 273 / 279 / 284 / 291 | 262 / 272 / 279 / 284 / 294 |
+
+* The two agree within 3 MPa at every quantile, so with defects spread
+  in 3D, interaction is negligible for these populations.
+* The closed form takes 0.05 s per population after a 20 s map, against
+  about 30 s for 200 Monte Carlo simulations. The predicted mean killer
+  sizes are identical (0.062, 0.081 and 0.079 mm).
+* Monte Carlo remains necessary when defects lie in one plane or cluster
+  (Sections above).
+
+
 Scope: the 2023 scripts in this repository, the February 2025 versions in the
 2024_DefectPopulation project (`Nasgro.m`, `multi_coalition_version3.m`,
 `Command_script.m`), and the two papers:

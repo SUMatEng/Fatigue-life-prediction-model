@@ -118,6 +118,37 @@ by BS 7910.
 * 'legacy' and 'paper' presets, the fminsearch solver, fixed 100-cycle
   stepping, and creep growth of arrested cracks.
 
+## Weakest link (closed form)
+
+With crack arrest, a part fails at the smallest stress at which any defect
+cannot arrest. `flpm.arrestMap` tabulates that stress for an isolated
+defect, Δσ_w(√area, ζ = z/r), on a log-size × relative-depth grid. The
+grid is split at Murakami's proximity limit, where Δσ_w jumps.
+`flpm.weakestLink` then gives the strength distribution without sampling:
+
+```
+P_s(Δσ) = exp(−Λ(Δσ))              Poisson count
+P_s(Δσ) = (1 − Λ(Δσ)/n)^n          fixed count n
+Λ(Δσ)   = λ ∫ 1(Δσ_w(a, z)/f(x) ≤ Δσ) dF(a) dF(z) dx/|x|
+```
+
+f(x) = f(depth, position, axial) is the local stress range relative to
+the nominal one, taken at the defect centre. That makes the result
+transferable to notches, gradients and components. Several populations
+multiply their P_s. The expectation is evaluated by quadrature at
+mid-point quantiles of the truncated descriptors. The probability that
+each quadrature node is the killer follows from the same expression, so
+killer-size and killer-depth distributions come for free.
+
+The closed form leaves out interaction and clustering, which only
+`flpm.monteCarlo` includes. It is exact in the limit of no interaction,
+and its difference from Monte Carlo measures the effect of interaction.
+
+* **Flag (needs confirmation):** with a stress gradient, f is evaluated
+  at the defect centre, and the crack-growth integration assumes uniform
+  stress over the defect. For gradients that vary over a defect size, use
+  a weight-function K. That is not implemented.
+
 ## Defect clustering (Thomas process)
 
 Defect locations are by default independent (a Poisson process). A

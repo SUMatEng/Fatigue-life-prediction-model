@@ -58,6 +58,7 @@ axial positions with `flpm.defectSet(size, depth, position, 'Axial', y)`.
 | `flpm.fatigueStrength` | Stress range giving the target life |
 | `flpm.monteCarlo` | Strength distribution and killer-defect statistics |
 | `flpm.roughnessShielding` | Y_R and √area_R from Rv and RSm |
+| `flpm.arrestMap`, `flpm.weakestLink` | Closed-form strength distribution P_s = exp(−Λ), stress fields, killer probabilities |
 | `flpm.clustering` | Thomas cluster process for defect locations (`'Clustering'` of a population) |
 | `flpm.fitClustering` | Fit κ, μ, σ to measured centres (Ripley's K, minimum contrast), G-test, mark tests |
 
