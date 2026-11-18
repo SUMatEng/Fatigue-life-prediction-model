@@ -9,7 +9,7 @@ classdef FlpmWeakestLinkTest < matlab.unittest.TestCase
     methods (TestClassSetup)
         function buildMap(tc)
             tc.mat = flpm.material('Ti64-AB');
-            tc.map = flpm.arrestMap(tc.mat, [], 'SizeRange', [0.015 0.25], 'NumSizes', 14);
+            tc.map = flpm.arrestMap(tc.mat, [], 'SizeRange', [0.015 0.25], 'NumSizes', 24);
         end
     end
 
@@ -19,7 +19,7 @@ classdef FlpmWeakestLinkTest < matlab.unittest.TestCase
             z = [0.6 0.031 0.06 0.5];         % internal, surface, near-surface, internal
             for k = 1:numel(a)
                 r = flpm.fatigueStrength(flpm.defectSet(a(k), z(k), 0), tc.mat);
-                tc.verifyEqual(tc.map.eval(a(k), z(k)), r.stress, 'RelTol', 0.02);
+                tc.verifyEqual(tc.map.eval(a(k), z(k)), r.stress, 'RelTol', 0.02);   % interpolation
             end
             tc.verifyError(@() tc.map.eval(1, 1), 'flpm:arrestMap:range');
         end
@@ -68,7 +68,7 @@ classdef FlpmWeakestLinkTest < matlab.unittest.TestCase
             T = flpm.monteCarlo(p, tc.mat, 'SurfaceLength', 1e4, 'AxialLength', 1e4, ...
                 'NumSimulations', 300, 'Seed', 3, 'UseParallel', true);
             q = [0.1 0.25 0.5 0.75 0.9];
-            tc.verifyEqual(W.quantile(q), quantile(T.stress, q), 'RelTol', 0.03);
+            tc.verifyEqual(W.quantile(q), quantile(T.stress, q).', 'RelTol', 0.03);
         end
     end
 end

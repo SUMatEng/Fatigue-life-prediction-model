@@ -180,12 +180,17 @@ for i = 1:numel(P)
         [~, lsk] = survival(P{k}, T.sigmaC, true);
         logOther = logOther + lsk;
     end
-    [~, ~, Fi] = survival(P{i}, T.sigmaC, true);     % mass strictly below
+    % probability that the minimum of population i falls on node j
+    % (nodes in sorted order; ties split in that order)
+    cw = cumsum(T.w);
+    Fb = [0; cw(1:end-1)];
     if P{i}.poisson
-        h = P{i}.mu * T.w .* exp(-P{i}.mu * Fi);
+        Sfun = @(F) exp(-P{i}.mu * F);
     else
-        h = P{i}.mu * T.w .* max(1 - Fi, 0).^(P{i}.mu - 1);
+        Sfun = @(F) max(1 - F, 0).^P{i}.mu;
     end
+    h = Sfun(Fb) - Sfun(cw);
+    h(~isfinite(T.sigmaC)) = 0;
     T.weight = h .* exp(logOther);
     K{i} = T;
 end
