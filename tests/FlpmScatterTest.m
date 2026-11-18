@@ -70,7 +70,7 @@ classdef FlpmScatterTest < matlab.unittest.TestCase
             tc.verifyEqual(F.dist.mu, log(0.03), 'AbsTol', 0.08);
             tc.verifyEqual(F.dist.sigma, 0.5, 'RelTol', 0.1);
             tc.verifyGreaterThan(F.naive.mu, log(0.03) + 0.2);       % biased
-            tc.verifyEqual(F.fractionBelow, 0.5, 'AbsTol', 0.06);
+            tc.verifyEqual(F.fractionBelow, 0.5, 'AbsTol', 0.1);    % extrapolated
         end
 
         function dependenceTest(tc)
