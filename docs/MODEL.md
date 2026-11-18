@@ -157,6 +157,58 @@ maximum principal stress n. It has two forms:
 * From the equivalent ellipsoid (semi-axes and principal directions):
   A(n) = π a b c √(nᵀ M n), with M = Q diag(a⁻², b⁻², c⁻²) Qᵀ.
 
+## Finite life and the internal environment
+
+**Growth-law calibration.** `flpm.fitGrowthLaw(dK, dadN, ...)` fits the
+model's own NASGRO form to measured (ΔK, da/dN) pairs by least squares in
+log da/dN:
+
+* `'Closure', true` is for long-crack data in air. The law is
+  F = U(R)^m with ΔKth = ΔKth,lc, which returns C1, m, p and ΔKth,lc.
+* `'Closure', false` is for vacuum or internal-crack data. The law is
+  F = 1 with ΔKth = ΔKth,eff, which returns C1 (with m and p) and the
+  threshold.
+
+The finite-life branch of the S–N curve (above the arrest step) follows
+from this law. It is the part that the removed 1e-12 m/cycle creep used
+to fill below the step. The model stays a fatigue-limit model: below the
+step every crack arrests.
+
+**Sealed (internal) cracks.** `mat.sealed` gives the constants of cracks
+whose disc does not reach the free surface (z > r). Any of C1, ΔKth,eff
+and ΔKth,lc can be given, and `closure = false` sets U = 1 for those
+cracks. When a crack breaks the surface it switches to the air
+constants. The default is empty, so there is no environment effect.
+
+**Literature check (abstracts only; full texts not accessible here).**
+
+* Yoshinaka et al., FFEMS 42 (2019), doi:10.1111/ffe.13085, used SR-µCT on
+  wrought (α+β) Ti-6Al-4V in the VHCF regime. Internal crack growth rates
+  were below 1e-10 m/cycle and fell to 1e-13 to 1e-11 m/cycle at
+  ΔK < 5 MPa√m. These rates closely matched surface cracks in high
+  vacuum, and the authors attribute the long internal-fracture lives to
+  the vacuum-like environment inside the crack.
+* Yoshinaka et al., FFEMS (2022), doi:10.1111/ffe.13765, used nano-CT. The
+  internal crack tip was blunted, as in vacuum, and its CTOD was almost
+  independent of the load, unlike surface cracks.
+* Yoshinaka et al., Int. J. Fatigue (2021), doi:10.1016/j.ijfatigue.2020.105961,
+  studied the effect of vacuum pressure on small-crack growth in
+  Ti-6Al-4V. Only the title was seen.
+* Sadananda et al., FFEMS (2022), doi:10.1111/ffe.13696, report that in
+  vacuum ΔKth is nearly independent of R and that the small-crack effect
+  is diminished. This motivates `closure = false` for sealed cracks.
+
+**Flagged as unverified for this material.** The evidence is for wrought
+Ti-6Al-4V with cracks initiated at α facets. LPBF pores contain the build
+gas (argon), not vacuum. Whether a pore-initiated internal crack in LPBF
+Ti-6Al-4V grows at vacuum rates has not been established here. No
+vacuum constants are set by default. To use the effect, fit `mat.sealed`
+from vacuum or internal-crack data, for example digitised curves from the
+papers above or your own SR-CT data. Note that C1 changes only the life.
+The fatigue strength at 10⁷ cycles changes only through the sealed
+thresholds, because the strength is an arrest step. The closure length l
+keeps its air value.
+
 ## Termination
 
 * Failure is Kmax ≥ K_IC (Kmax = ΔK/(1 − R), shifted by any residual stress). There is no net-section criterion,

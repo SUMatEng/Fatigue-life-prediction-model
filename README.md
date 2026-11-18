@@ -59,6 +59,7 @@ axial positions with `flpm.defectSet(size, depth, position, 'Axial', y)`.
 | `flpm.fatigueStrength` | Stress range giving the target life |
 | `flpm.monteCarlo` | Strength distribution and killer-defect statistics |
 | `flpm.roughnessShielding` | Y_R and √area_R from Rv and RSm |
+| `flpm.fitGrowthLaw` | Calibrate the near-threshold growth law (air, or sealed/vacuum) from da/dN data |
 | `flpm.projectedArea` | √area on the plane normal to the load, from XCT projections or an ellipsoid |
 | `flpm.arrestMap`, `flpm.weakestLink` | Closed-form strength distribution P_s = exp(−Λ), stress fields, killer probabilities |
 | `flpm.fitSN`, `flpm.compareSN` | Random fatigue-limit S–N fit (censored run-outs); test of the predicted limit |
