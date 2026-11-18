@@ -53,16 +53,18 @@ S.dK = s * Y0 .* sqrt(pi * A0);
 
 N = 0;
 nSteps = 0;
-gRef = struct('id', [], 'a', [], 'gam', []);
+gRef = struct('id', [], 'a', [], 'gam', [], 'tol', []);
 hist = zeros(opts.RecordHistory * 1024, 3);
 while true
     nSteps = nSteps + 1;
     S = flpm.internal.coalesce(S);
     [Y, A, cls] = flpm.internal.stressIntensity(S);
     % interaction factor, re-evaluated when a crack has grown by more than
-    % 1 % since the last evaluation (it is accurate to ~2 % anyway)
-    if ~isequal(gRef.id, S.id) || any(abs(S.a - gRef.a) > 0.01 * gRef.a)
-        gRef = struct('id', S.id, 'a', S.a, 'gam', flpm.internal.interactionFactor(S));
+    % 2 Eta of its size or of its gap to the nearest neighbour since the
+    % last evaluation
+    if ~isequal(gRef.id, S.id) || any(abs(S.a - gRef.a) > gRef.tol)
+        gRef = struct('id', S.id, 'a', S.a, 'gam', flpm.internal.interactionFactor(S), ...
+            'tol', 2 * opts.Eta * min(S.a, sqrt(pi) * nearestGap(S)));
     end
     gam = gRef.gam;
     Y = Y .* gam;                      % interaction amplifies or shields K
@@ -151,6 +153,16 @@ active = F2 .* dK >= dKe & isOpen;
 rate = zeros(size(S.a));
 g = active & dKg > dKth;
 rate(g) = C1(g) .* F1(g) .* dKg(g).^(mat.m - mat.p) .* (dKg(g) - dKth(g)).^mat.p;
+end
+
+function g = nearestGap(S)
+% edge gap of every crack to its nearest neighbour (Inf if alone)
+n = numel(S.a);
+if n < 2, g = Inf(n, 1); return, end
+r = S.a / sqrt(pi);
+D = sqrt((S.s - S.s.').^2 + (S.z - S.z.').^2 + (S.y - S.y.').^2) - (r + r.');
+D(1:n+1:end) = Inf;
+g = max(min(D, [], 2), 0);
 end
 
 function [kmax, U, isOpen] = local(S, c, s)
