@@ -28,6 +28,11 @@ classdef FlpmClusteringTest < matlab.unittest.TestCase
                 'Count', 12, 'Clustering', c);
             s2 = flpm.samplePopulation(p2, 'simulation', 1, 'SurfaceLength', 10);
             tc.verifyNumElements(s2.size, 12);
+            % one cluster holding every defect
+            p3 = flpm.defectPopulation('volumetric', 'Size', 0.05, 'Depth', 1, ...
+                'Count', 9, 'Clustering', flpm.clustering('MeanClusterSize', 9, 'Spread', 0.1));
+            s3 = flpm.samplePopulation(p3, 'simulation', 1, 'SurfaceLength', 10, 'AxialLength', 2);
+            tc.verifySize(s3.position, [9 1]);
         end
 
         function clusteringShortensNeighbourDistance(tc)

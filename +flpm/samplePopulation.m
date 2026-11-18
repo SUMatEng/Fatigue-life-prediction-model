@@ -120,7 +120,7 @@ else                                   % fixed total, shared among the parents
     k = accumarray(randi(rs, max(np, 1), n, 1), 1, [np 1]);
 end
 n = sum(k);
-idx = repelem((1:np)', k);
+idx = reshape(repelem((1:np)', k), [], 1);   % column also for np = 1
 pPos = L * rand(rs, np, 1);
 pAx = Lz * rand(rs, np, 1);
 pos = mod(pPos(idx) + c.spread(1) * randn(rs, n, 1), L);
