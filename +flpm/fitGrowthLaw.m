@@ -13,7 +13,7 @@ function G = fitGrowthLaw(dK, dadN, varargin)
 %   ('Closure', true, for air data on long cracks), or F = 1 and
 %   dKth = dKth_eff ('Closure', false). The latter is for vacuum and
 %   internal-crack data, for which the threshold is reported to be nearly
-%   independent of R (Sadananda et al., FFEMS 45 (2022), doi:
+%   independent of R (Vasudevan & Kujawski, FFEMS 45 (2022), doi:
 %   10.1111/ffe.13696), i.e. closure is small. The exponents m and p are
 %   fitted unless fixed.
 %

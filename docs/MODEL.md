@@ -188,13 +188,13 @@ constants. The default is empty, so there is no environment effect.
   ΔK < 5 MPa√m. These rates closely matched surface cracks in high
   vacuum, and the authors attribute the long internal-fracture lives to
   the vacuum-like environment inside the crack.
-* Yoshinaka et al., FFEMS (2022), doi:10.1111/ffe.13765, used nano-CT. The
+* Xue et al., FFEMS 45 (2022), doi:10.1111/ffe.13765, used nano-CT. The
   internal crack tip was blunted, as in vacuum, and its CTOD was almost
   independent of the load, unlike surface cracks.
-* Yoshinaka et al., Int. J. Fatigue (2021), doi:10.1016/j.ijfatigue.2020.105961,
+* Yoshinaka et al., Int. J. Fatigue 142 (2021), doi:10.1016/j.ijfatigue.2020.105961,
   studied the effect of vacuum pressure on small-crack growth in
   Ti-6Al-4V. Only the title was seen.
-* Sadananda et al., FFEMS (2022), doi:10.1111/ffe.13696, report that in
+* Vasudevan & Kujawski, FFEMS 45 (2022), doi:10.1111/ffe.13696, report that in
   vacuum ΔKth is nearly independent of R and that the small-crack effect
   is diminished. This motivates `closure = false` for sealed cracks.
 
