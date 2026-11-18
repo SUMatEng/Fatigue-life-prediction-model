@@ -53,12 +53,18 @@ S.dK = s * Y0 .* sqrt(pi * A0);
 
 N = 0;
 nSteps = 0;
+gRef = struct('id', [], 'a', [], 'gam', []);
 hist = zeros(opts.RecordHistory * 1024, 3);
 while true
     nSteps = nSteps + 1;
     S = flpm.internal.coalesce(S);
     [Y, A, cls] = flpm.internal.stressIntensity(S);
-    gam = flpm.internal.interactionFactor(S);
+    % interaction factor, re-evaluated when a crack has grown by more than
+    % 1 % since the last evaluation (it is accurate to ~2 % anyway)
+    if ~isequal(gRef.id, S.id) || any(abs(S.a - gRef.a) > 0.01 * gRef.a)
+        gRef = struct('id', S.id, 'a', S.a, 'gam', flpm.internal.interactionFactor(S));
+    end
+    gam = gRef.gam;
     Y = Y .* gam;                      % interaction amplifies or shields K
     S.dK = s * Y .* sqrt(pi * A);
 
@@ -87,7 +93,7 @@ while true
     T.a = S.a + rate * dN;
     T.ext = S.ext + rate * dN;
     [YT, AT] = flpm.internal.stressIntensity(T);
-    YT = YT .* flpm.internal.interactionFactor(T);
+    YT = YT .* gam;
     rateT = growthRates(T, YT, AT, s, c, mat);
     rate = 0.5 * (rate + rateT .* (rate > 0));
 
