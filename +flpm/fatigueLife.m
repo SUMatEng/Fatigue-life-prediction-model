@@ -74,7 +74,6 @@ while true
     end
 
     % 2. driving force and thresholds
-    rp = c.rpFactor * (dK / (1 - c.R) / mat.sigma0).^2;
     if opts.NetSectionInDeltaK
         if isempty(sigG)
             sigG = netStress(amax, s, c);       % initialise (code: undefined)
@@ -84,30 +83,13 @@ while true
     else
         sigG = s;
     end
-    dKg = sigG * Y .* sqrt(pi * (S.a + rp));
-    decay = exp(-S.ext / c.l);
-    dKth = mat.dKth_eff + (mat.dKth_lc - mat.dKth_eff) * (1 - decay);
-    F1 = 1 - (1 - c.U^mat.m) * (1 - decay);
-    F2 = 1 - (1 - c.U) * (1 - decay);
-    if strcmpi(opts.InitiationStress, 'net')
-        dKcheck = sigG * Y .* sqrt(pi * S.a);
-    else
-        dKcheck = dK;
-    end
-    active = F2 .* dKcheck >= mat.dKth_eff;
+    [rate, active] = growthRates(S, Y, dK, s, sigG, c, mat, opts);
 
     if nSteps == 1 && ~any(active)
         status = 'noGrowth';
         N = Inf;
         break
     end
-
-    rate = zeros(size(S.a));
-    above = active & dKg > dKth;
-    rate(above) = mat.C1 * F1(above) .* dKg(above).^(mat.m - mat.p) ...
-        .* (dKg(above) - dKth(above)).^mat.p;
-    creep = active & ~above & dKg < dKth;      % dKg == dKth: no growth (code)
-    rate(creep) = opts.CreepRate;
 
     if ~any(rate > 0)
         % Nothing can change any more: the state is frozen -> run-out.
@@ -123,7 +105,15 @@ while true
         dN = adaptiveStep(S, rate, cls, D, c, opts);
     end
 
-    % 4. growth
+    % 4. growth (adaptive: Heun predictor-corrector, 2nd order in dN)
+    if ~fixed
+        T = S;
+        T.a = S.a + rate * dN;
+        T.ext = S.ext + rate * dN;
+        YT = flpm.internal.geometryFactors(T, D, opts, c.rScale);
+        rateT = growthRates(T, YT, s * YT .* sqrt(pi * T.a), s, sigG, c, mat, opts);
+        rate = 0.5 * (rate + rateT .* (rate > 0));
+    end
     da = rate * dN;
     aOld = S.a;
     S.a = S.a + da;
@@ -188,6 +178,28 @@ switch lower(opts.InteractionRadius)
     otherwise
         error('flpm:opts:InteractionRadius', 'Unknown InteractionRadius.');
 end
+end
+
+function [rate, active] = growthRates(S, Y, dK, s, sigG, c, mat, opts)
+% NASGRO / Maierhofer growth rate of every defect (m/cycle).
+rp = c.rpFactor * (dK / (1 - c.R) / mat.sigma0).^2;
+dKg = sigG * Y .* sqrt(pi * (S.a + rp));
+decay = exp(-S.ext / c.l);
+dKth = mat.dKth_eff + (mat.dKth_lc - mat.dKth_eff) * (1 - decay);
+F1 = 1 - (1 - c.U^mat.m) * (1 - decay);
+F2 = 1 - (1 - c.U) * (1 - decay);
+if strcmpi(opts.InitiationStress, 'net')
+    dKcheck = sigG * Y .* sqrt(pi * S.a);
+else
+    dKcheck = dK;
+end
+active = F2 .* dKcheck >= mat.dKth_eff;
+rate = zeros(size(S.a));
+above = active & dKg > dKth;
+rate(above) = mat.C1 * F1(above) .* dKg(above).^(mat.m - mat.p) ...
+    .* (dKg(above) - dKth(above)).^mat.p;
+creep = active & ~above & dKg < dKth;      % dKg == dKth: no growth (code)
+rate(creep) = opts.CreepRate;
 end
 
 function S = netStress(a, s, c)
