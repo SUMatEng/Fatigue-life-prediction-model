@@ -20,8 +20,10 @@ function out = fatigueLife(stressRange, defects, mat, opts)
 %   (flpm.internal.stressIntensity), U from Newman's closure function and
 %   l the difference of the El Haddad lengths of dKth,lc and dKth,eff
 %   (Y = 0.65). A crack grows once F2*dK >= dKth,eff with
-%   F2 = 1 - (1 - U)(1 - exp(-Da/l)); below dKth it is arrested. Flaws that
-%   interact by the BS 7910 rules are re-characterised as one flaw
+%   F2 = 1 - (1 - U)(1 - exp(-Da/l)); below dKth it is arrested.
+%   Neighbouring cracks multiply K by a continuous interaction factor
+%   (Kachanov's method, flpm.internal.interactionFactor); cracks whose
+%   projections touch link up and are re-characterised after BS 7910
 %   (flpm.internal.coalesce). The run ends with
 %     failure   Kmax >= KIC
 %     run-out   no crack can grow, or N > 1.02 * TargetLife
@@ -56,6 +58,8 @@ while true
     nSteps = nSteps + 1;
     S = flpm.internal.coalesce(S);
     [Y, A, cls] = flpm.internal.stressIntensity(S);
+    gam = flpm.internal.interactionFactor(S);
+    Y = Y .* gam;                      % interaction amplifies or shields K
     S.dK = s * Y .* sqrt(pi * A);
 
     if max(S.dK) / (1 - c.R) >= mat.KIC
@@ -83,6 +87,7 @@ while true
     T.a = S.a + rate * dN;
     T.ext = S.ext + rate * dN;
     [YT, AT] = flpm.internal.stressIntensity(T);
+    YT = YT .* flpm.internal.interactionFactor(T);
     rateT = growthRates(T, YT, AT, s, c, mat);
     rate = 0.5 * (rate + rateT .* (rate > 0));
 
@@ -153,17 +158,14 @@ vr = rate / sqrt(pi);
 small = 0.01 * eta * r;
 n = numel(S.a);
 if n > 1
-    % distance to the BS 7910 interaction limit, which moves at most at
-    % 3 (dr1 + dr2)/dN (flpm.internal.coalesce)
+    % distance to contact of the projections (link-up), which closes at
+    % most at (dr1 + dr2)/dN; aligned planes only (flpm.internal.coalesce)
     rr = r + r.';
-    gIn = max(hypot(S.s - S.s.', S.z - S.z.') - rr, 0);
-    gapA = hypot(abs(S.y - S.y.'), gIn) - rr;
-    sx = abs(S.s - S.s.') - rr;  sz = abs(S.z - S.z.') - rr;
-    gapC = min(max(sx - 2*min(r, r.'), sz), max(sz - rr, sx));
-    gap = max(gapA, gapC);
-    v = 3 * (vr + vr.');
+    gap = hypot(S.s - S.s.', S.z - S.z.') - rr;
+    aligned = abs(S.y - S.y.') <= rr;
+    v = vr + vr.';
     allow = 0.5 * gap + min(small, small.');
-    mask = v > 0 & ~eye(n, 'logical') & gap > 0;
+    mask = v > 0 & ~eye(n, 'logical') & gap > 0 & aligned;
     if any(mask(:))
         dN = min(dN, min(allow(mask) ./ v(mask)));
     end

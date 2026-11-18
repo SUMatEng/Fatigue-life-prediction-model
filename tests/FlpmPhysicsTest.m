@@ -60,60 +60,72 @@ classdef FlpmPhysicsTest < matlab.unittest.TestCase
             tc.verifySize(flpm.roughnessShielding([0.01 0.02 0.05], 0.1), [1 3]);
         end
 
-        function bs7910SideBySideAndRecharacterisation(tc)
-            % two coplanar circular flaws at the same depth, gap 0.9 x the
-            % smaller length: interact; replaced by the containing rectangle
+        function linkUpAndRecharacterisation(tc)
+            % overlapping coplanar flaws link up; replaced by the ellipse
+            % inscribed in the containing rectangle (BS 7910)
             a1 = 0.06e-3; a2 = 0.04e-3; r1 = a1/sqrt(pi); r2 = a2/sqrt(pi);
-            gapS = 0.9 * 2*r2;
-            S = state([a1 a2], [0.5e-3 0.5e-3], [0, r1 + r2 + gapS]);
+            S = state([a1 a2], [0.5e-3 0.5e-3], [0, r1 + r2 - 0.1*r2]);
             S.ext = [2e-6; 5e-6];  S.dK = [2; 1];
             [M, merged] = flpm.internal.coalesce(S);
             tc.verifyTrue(merged);
-            c = (2*r1 + 2*r2 + gapS)/2;  h = r1;          % half-length, half-height
+            c = (2*r1 + 2*r2 - 0.1*r2)/2;  h = r1;
             tc.verifyEqual(M.a, sqrt(pi*c*h), 'RelTol', 1e-12);
             tc.verifyEqual(M.s, -r1 + c, 'RelTol', 1e-12);
             tc.verifyEqual(M.ext, 5e-6);
             tc.verifyEqual(M.id, 1);
-            % beyond the smaller length: independent
-            S = state([a1 a2], [0.5e-3 0.5e-3], [0, r1 + r2 + 1.1*2*r2]);
+            % a gap, however small, is interaction, not link-up
+            S = state([a1 a2], [0.5e-3 0.5e-3], [0, r1 + r2 + 0.05*r2]);
             [~, merged] = flpm.internal.coalesce(S);
             tc.verifyFalse(merged);
         end
 
-        function bs7910StackedInDepth(tc)
+        function linkUpNeedsAlignedPlanes(tc)
             a = 0.05e-3; r = a/sqrt(pi);
-            S = state([a a], [0.5e-3, 0.5e-3 + 2*r + 0.95*2*r]);   % gap 0.95 (a1+a2)
-            [~, merged] = flpm.internal.coalesce(S);
-            tc.verifyTrue(merged);
-            S = state([a a], [0.5e-3, 0.5e-3 + 2*r + 1.05*2*r]);
-            [~, merged] = flpm.internal.coalesce(S);
-            tc.verifyFalse(merged);
-            % diagonal offset (neither side by side nor stacked): independent
-            S = state([a a], [0.5e-3, 0.5e-3 + 2.5*r], [0, 2.5*r]);
-            [~, merged] = flpm.internal.coalesce(S);
-            tc.verifyFalse(merged);
-        end
-
-        function bs7910NonCoplanarAlignment(tc)
-            a = 0.05e-3; r = a/sqrt(pi);
-            S = state([a a], [0.5e-3 0.5e-3], [0 0]);
-            S.y = [0; 0.9*2*r];                  % planes closer than 0.5(l1 + l2)
+            S = state([a a], [0.5e-3 0.5e-3], [0 1.5*r]);
+            S.y = [0; 1.9*r];                    % H <= 0.5 (l1 + l2)
             [M, merged] = flpm.internal.coalesce(S);
             tc.verifyTrue(merged);
-            tc.verifyEqual(M.y, 0.9*r, 'RelTol', 1e-12);
-            S.y = [0; 1.1*2*r];
+            tc.verifyEqual(M.y, 0.95*r, 'RelTol', 1e-12);
+            S.y = [0; 2.1*r];
             [~, merged] = flpm.internal.coalesce(S);
             tc.verifyFalse(merged);
         end
 
         function coalescenceIsTransitive(tc)
-            a = 0.05e-3; r = a/sqrt(pi); d = 3.5*r;    % 1-2, 2-3 interact; 1-3 not
+            a = 0.05e-3; r = a/sqrt(pi); d = 1.9*r;    % 1-2, 2-3 overlap; 1-3 not
             S = state([a a a], [1e-3 1e-3 1e-3], [0 d 2*d]);
             S.dK = [1; 3; 2];
             M = flpm.internal.coalesce(S);
             tc.verifyNumElements(M.a, 1);
             tc.verifyEqual(M.id, 2);
             tc.verifyEqual(M.a, sqrt(pi*(r + d)*r), 'RelTol', 1e-12);
+        end
+
+        function pennyCrackStressField(tc)
+            ps = @flpm.internal.pennyStress;
+            tc.verifyEqual(ps([0 0.5 0.9], [0 0 0]), [-1 -1 -1], 'AbsTol', 1e-12);
+            rho = [1.2 2 5];
+            tc.verifyEqual(ps(rho, 0*rho), (2/pi)*(1./sqrt(rho.^2 - 1) - asin(1./rho)), 'RelTol', 1e-10);
+            z = [0.3 1 3];                         % on the axis (closed form)
+            tc.verifyEqual(ps(0*z, z), -(2/pi)*(atan(1./z) - z.*(z.^2 - 1)./(1 + z.^2).^2), 'RelTol', 1e-10);
+            % continuity off the plane
+            tc.verifyEqual(ps(2, 1e-7), ps(2, 0), 'RelTol', 1e-5);
+        end
+
+        function interactionFactorValues(tc)
+            r = 1; a = sqrt(pi)*r;
+            st = @(s, y) struct('a', [a; a], 's', s(:), 'z', [5; 5], 'y', y(:));
+            g = flpm.internal.interactionFactor(st([0 2.1], [0 0]));
+            tc.verifyEqual(g, [1 1]' * 1.29, 'RelTol', 0.03);       % gap 0.1 r
+            g = flpm.internal.interactionFactor(st([0 2.5], [0 0]));
+            tc.verifyEqual(g(1), 1.064, 'RelTol', 0.01);              % gap 0.5 r
+            g = flpm.internal.interactionFactor(st([0 0], [0 0.25]));
+            tc.verifyEqual(g(1), 0.744, 'RelTol', 0.04);              % coaxial, shielding
+            g = flpm.internal.interactionFactor(st([0 30], [0 0]));
+            tc.verifyEqual(g, [1; 1]);                                % far apart
+            % scale invariance
+            S = st([0 2.3], [0 0.4]); S2 = S; S2.a = 1e-4*S.a; S2.s = 1e-4*S.s; S2.z = 1e-4*S.z; S2.y = 1e-4*S.y;
+            tc.verifyEqual(flpm.internal.interactionFactor(S2), flpm.internal.interactionFactor(S), 'RelTol', 1e-9);
         end
 
         function noCoalescenceWhenApart(tc)

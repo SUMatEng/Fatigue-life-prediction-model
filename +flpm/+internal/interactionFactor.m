@@ -16,7 +16,11 @@ function [gam, info] = interactionFactor(S, opts)
 %   non-uniform traction t(P) on crack i gives K along its front by the
 %   exact weight function of the penny crack (Galin; Kassir & Sih),
 %       K(Q) = 1/(pi sqrt(pi r)) int t(P) sqrt(r^2 - rho_P^2)/|PQ|^2 dA,
-%   evaluated at 24 front points; gam is max_Q K(Q)/K_uniform(Q).
+%   evaluated at 24 front points with the singularity subtracted (the
+%   kernel integrates to 2 pi r), on a 32 x 64 area-uniform grid (within
+%   about 2 % of a converged quadrature at an edge gap of 0.1 r); gam is
+%   max_Q K(Q)/K_uniform. Checks: equal coplanar cracks, gap 0.1 r: 1.29;
+%   gap 0.5 r: 1.06; coaxial cracks 0.25 r apart: 0.74 (shielding).
 %   Pairs farther apart than 4 (r_i + r_j) between edges are taken as
 %   non-interacting (amplification below about 1 %). Parallel cracks
 %   offset along the load axis shield or amplify according to the sign
@@ -52,16 +56,22 @@ end
 p = (eye(m) - Lam) \ ones(m, 1);
 for a = 1:m
     i = idx(a);
+    Qp = [S.s(i) + r(i) * xf(:, 1), S.z(i) + r(i) * xf(:, 2)];        % front points
     t = ones(size(xq, 1), 1);
+    tQ = ones(size(xf, 1), 1);
     for b = 1:m
         j = idx(b);
         if a == b || ~near(i, j), continue, end
         t = t + p(b) * induced(P{a}, S, j, r(j), S.y(i));
+        tQ = tQ + p(b) * induced(Qp, S, j, r(j), S.y(i));
     end
-    % weight function at the front points Q (unit circle)
+    % weight function with the singularity subtracted:
+    % int sqrt(1-rho^2)/|PQ|^2 dA = 2 pi on the unit disc, so
+    % K(Q)/K_uniform = t(Q) + (1/2) sum (t - t(Q)) W
     dx = xq(:, 1) - xf(:, 1).';  dy = xq(:, 2) - xf(:, 2).';
     Wt = sqrt(max(1 - sum(xq.^2, 2), 0)) .* wq ./ (dx.^2 + dy.^2);
-    gam(i) = max((t.' * Wt) ./ sum(Wt, 1));
+    g = tQ.' + 0.5 * sum((t - tQ.') .* Wt, 1);
+    gam(i) = max(g);
 end
 end
 
@@ -74,26 +84,17 @@ s(~isfinite(s)) = 0;
 end
 
 function [xq, wq, xf] = quadrature()
+% mid-point rule in r^2 and theta (area-uniform), weights = dA/pi
 persistent X W F
 if isempty(X)
-    nr = 16; nt = 32;
-    [u, wu] = gaussLegendre(nr);              % on [0, 1]
-    rr = sqrt(u);                              % area-uniform in radius
-    th = (0:nt-1)' / nt * 2 * pi;
+    nr = 32; nt = 64;
+    rr = sqrt(((1:nr)' - 0.5) / nr);
+    th = (0:nt-1) / nt * 2 * pi;
     [R, T] = ndgrid(rr, th);
     X = [R(:) .* cos(T(:)), R(:) .* sin(T(:))];
-    Wm = repmat(wu, 1, nt) / nt;               % area fractions, sum = 1
-    W = Wm(:);
+    W = ones(numel(R), 1) / numel(R);
     tf = (0:23)' / 24 * 2 * pi;
     F = [cos(tf), sin(tf)];
 end
 xq = X; wq = W; xf = F;
-end
-
-function [x, w] = gaussLegendre(n)
-k = 1:n-1;
-b = k ./ sqrt(4 * k.^2 - 1);
-[V, Dg] = eig(diag(b, 1) + diag(b, -1));
-x = (diag(Dg) + 1) / 2;
-w = (2 * V(1, :).'.^2) / 2;
 end
