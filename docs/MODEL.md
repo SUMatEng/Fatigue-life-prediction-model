@@ -211,7 +211,13 @@ keeps its air value.
 
 ## Termination
 
-* Failure is Kmax ≥ K_IC (Kmax = ΔK/(1 − R), shifted by any residual stress). There is no net-section criterion,
+* Failure is Kmax ≥ K_IC (Kmax = ΔK/(1 − R), shifted by any residual
+  stress), evaluated with the K of each crack without amplification by its
+  neighbours (γ clipped at 1). An amplified K ≥ K_IC on the side facing a
+  neighbour breaks the ligament. That is link-up, which growth reaches
+  within a few increments, and not fracture of the part. Without this
+  rule, the life jumped by about 8 % with the step size, depending on
+  whether a crack reached K_IC just before or just after linking. There is no net-section criterion,
   since that needs a cross-section.
 * A run-out is either arrest of every crack, or N > 1.02 × the target life.
 
