@@ -20,6 +20,10 @@ function mat = material(name, varargin)
 %       dSigma_e      defect-free fatigue strength (stress range)
 %       KIC           fracture toughness
 %       sigma0        cyclic yield strength (plastic-zone size)
+%       dKth_cov      coefficient of variation of dKth_lc between specimens
+%                     (lognormal, median dKth_lc); 0 = deterministic    [0]
+%                     It also scatters the closure length l, which
+%                     follows from dKth_lc through the El Haddad length.
 %
 %   See also flpm.options.
 
@@ -48,5 +52,5 @@ end
 function mat = base(name, C1, p, m, alpha, dKlc, dKeff, dSe, KIC, s0)
 mat = struct('name', name, 'C1', C1, 'p', p, 'm', m, 'alpha', alpha, ...
     'dKth_lc', dKlc, 'dKth_eff', dKeff, 'dSigma_e', dSe, 'KIC', KIC, ...
-    'sigma0', s0);
+    'sigma0', s0, 'dKth_cov', 0);
 end

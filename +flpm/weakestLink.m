@@ -24,6 +24,11 @@ function W = weakestLink(pops, mat, varargin)
 %   is given. Thresholds and roughness valleys are handled as in
 %   flpm.samplePopulation.
 %
+%   Scatter of the threshold between specimens (mat.dKth_cov > 0) is
+%   integrated over by Gauss-Hermite quadrature (7 nodes):
+%   P_s = sum_k w_k P_s(dSigma | dKth_lc,k). A size-depth copula
+%   (defectPopulation 'Copula') enters through joint quadrature weights.
+%
 %   Interaction (BS 7910) and clustering are outside this closed form;
 %   flpm.monteCarlo includes both. The closed form is exact in the limit
 %   of no interaction, and its difference from flpm.monteCarlo is the
@@ -35,7 +40,8 @@ function W = weakestLink(pops, mat, varargin)
 %     'StressField'    f(depth, position, axial) in mm, the local stress
 %                      range relative to the nominal one, evaluated at the
 %                      defect centre                                  [1]
-%     'Map'            flpm.arrestMap(...) to reuse; built if absent
+%     'Map'            flpm.arrestMap(...) to reuse (a cell, one per
+%                      threshold node, if mat.dKth_cov > 0); built if absent
 %     'Options'        flpm.options(...)
 %     'NumQuad'        quadrature points [size depth position axial]
 %                                                       [200 80 16 16]
@@ -83,15 +89,17 @@ for i = 1:numel(pops)
         warning('flpm:weakestLink:clustering', ...
             'Population %d is clustered; the closed form treats it as Poisson.', i);
     end
-    [sz, ws] = nodes(p.size, nq(1), p.sizeBounds);
+    [sz, ws, us] = nodes(p.size, nq(1), p.sizeBounds);
     sz = sz + p.sizeOffset;
     if ~isempty(p.threshold), ws(sz <= p.threshold) = 0; end
     if strcmp(p.type, 'surface')
         sz = sqrt(2) * (p.shielding / Ys)^2 * sz;
         dp = 0; wd = 1;
     else
-        [dp, wd] = nodes(p.depth, nq(2), p.depthBounds);
+        [dp, wd, ud] = nodes(p.depth, nq(2), p.depthBounds);
     end
+    cop = isfield(p, 'copula') && ~isempty(p.copula) && strcmp(p.type, 'volumetric') ...
+        && numel(sz) > 1 && numel(dp) > 1;
     if isempty(o.StressField)
         ps = 0; wp = 1; ya = 0; wy = 1;
     else
@@ -104,7 +112,17 @@ for i = 1:numel(pops)
     end
     [S1, D1, P1, Y1] = ndgrid(sz, dp, ps, ya);
     [w1, w2, w3, w4] = ndgrid(ws, wd, wp, wy);
-    w = w1 .* w2 .* w3 .* w4;
+    if cop                     % joint size-depth weights from the copula density
+        [U1, U2] = ndgrid(us, ud);
+        c = flpm.internal.copulaPdf(p.copula, [U1(:) U2(:)]);
+        c = reshape(c, size(U1));
+        c = c / sum(c(:));
+        w12 = repmat(c, 1, 1, numel(wp), numel(wy));
+        w12(ws <= 0, :, :, :) = 0;
+        w = w12 .* w3 .* w4;
+    else
+        w = w1 .* w2 .* w3 .* w4;
+    end
     keep = w(:) > 0;
     T = table(repmat(i, nnz(keep), 1), S1(keep), D1(keep), P1(keep), Y1(keep), w(keep), ...
         'VariableNames', {'population', 'size', 'depth', 'position', 'axial', 'w'});
@@ -124,53 +142,77 @@ for i = 1:numel(pops)
     P{i} = struct('T', T, 'mu', mu, 'poisson', poisson);
 end
 
-% ---- arrest map and critical stresses ----------------------------------
+% ---- arrest maps (one per threshold node) -------------------------------
 allT = vertcat(P{:});
 allT = vertcat(allT.T);
-M = o.Map;
-if isempty(M)
-    rng = [min(allT.size), max(allT.size)];
-    M = flpm.arrestMap(mat, opts, 'SizeRange', [0.9 1.1] .* rng);
+[mats, wt] = flpm.internal.thresholdNodes(mat);
+Ms = o.Map;
+if isempty(Ms)
+    rngS = [min(allT.size), max(allT.size)];
+    Ms = cellfun(@(m) flpm.arrestMap(m, opts, 'SizeRange', [0.9 1.1] .* rngS), mats, ...
+        'UniformOutput', false);
+elseif isstruct(Ms)
+    Ms = {Ms};
 end
-for i = 1:numel(P)
-    T = P{i}.T;
-    sw = M.eval(T.size, T.depth);
-    f = ones(height(T), 1);
-    if ~isempty(o.StressField)
-        f = o.StressField(T.depth, T.position, T.axial);
-        f = f(:) .* ones(height(T), 1);
-    end
-    T.sigmaC = sw ./ max(f, eps);
-    T.sigmaC(f <= 0) = Inf;
-    P{i}.T = sortrows(T, 'sigmaC');
+if numel(Ms) ~= numel(mats)
+    error('flpm:weakestLink:map', ...
+        'Give one map per threshold node (%d; flpm.internal.thresholdNodes).', numel(mats));
+end
+f = [];
+if ~isempty(o.StressField)
+    f = cellfun(@(q) o.StressField(q.T.depth, q.T.position, q.T.axial), P, 'UniformOutput', false);
 end
 
-% ---- survival functions ---------------------------------------------
-sc = unique(cell2mat(cellfun(@(q) q.T.sigmaC(isfinite(q.T.sigmaC)), P, 'UniformOutput', false)));
+% ---- weakest link at each node, then mixed over the threshold ---------
+R = cell(numel(Ms), 1);
+for k = 1:numel(Ms)
+    R{k} = core(P, Ms{k}, f);
+end
+sc = unique(cell2mat(cellfun(@(r) r.sc, R, 'UniformOutput', false)));
 stress = o.Stress;
 if isempty(stress), stress = sc; end
 stress = stress(:);
-[Lam, logS] = deal(zeros(size(stress)));
-for i = 1:numel(P)
-    [li, lsi] = survival(P{i}, stress);
-    Lam = Lam + li;
-    logS = logS + lsi;
+[Lam, S, Sn] = deal(zeros(size(stress)), zeros(size(stress)), zeros(size(sc)));
+K = cell(numel(R), 1);
+for k = 1:numel(R)
+    [Lk, lSk] = R{k}.at(stress);
+    Lam = Lam + wt(k) * Lk;
+    S = S + wt(k) * exp(lSk);
+    [~, lSn] = R{k}.at(sc);
+    Sn = Sn + wt(k) * exp(lSn);
+    Kk = R{k}.killers;
+    Kk.weight = wt(k) * Kk.weight;
+    Kk.thresholdNode = repmat(k, height(Kk), 1);
+    K{k} = Kk;
 end
 W.stress = stress;
 W.Lambda = Lam;
-W.Pf = 1 - exp(logS);
-% exact step functions on the node stresses
-[~, logSn] = deal(zeros(size(sc)));
-for i = 1:numel(P)
-    [~, lsi] = survival(P{i}, sc);
-    logSn = logSn + lsi;
-end
-Pfn = 1 - exp(logSn);
+W.Pf = 1 - S;
+Pfn = 1 - Sn;
 W.PfFun = @(s) stepEval(sc, Pfn, s);
 W.quantile = @(q) quantileFromStep(sc, Pfn, q);
 W.median = W.quantile(0.5);
+W.killers = vertcat(K{:});
+W.map = Ms;
+if numel(Ms) == 1, W.map = Ms{1}; end
+W.thresholdWeights = wt;
+W.surfaceLength = L;
+W.axialLength = Lz;
+end
 
-% ---- killer probabilities --------------------------------------------
+function R = core(P, M, f)
+% critical stresses, survival functions and killer probabilities for one map
+for i = 1:numel(P)
+    T = P{i}.T;
+    sw = M.eval(T.size, T.depth);
+    fi = ones(height(T), 1);
+    if ~isempty(f), fi = f{i}(:) .* ones(height(T), 1); end
+    T.sigmaC = sw ./ max(fi, eps);
+    T.sigmaC(fi <= 0) = Inf;
+    P{i}.T = sortrows(T, 'sigmaC');
+end
+R.sc = unique(cell2mat(cellfun(@(q) q.T.sigmaC(isfinite(q.T.sigmaC)), P, 'UniformOutput', false)));
+R.at = @(s) atStress(P, s);
 K = cell(numel(P), 1);
 for i = 1:numel(P)
     T = P{i}.T;
@@ -194,17 +236,23 @@ for i = 1:numel(P)
     T.weight = h .* exp(logOther);
     K{i} = T;
 end
-W.killers = removevars(vertcat(K{:}), 'w');
-W.map = M;
-W.surfaceLength = L;
-W.axialLength = Lz;
+R.killers = removevars(vertcat(K{:}), 'w');
+end
+
+function [Lam, logS] = atStress(P, s)
+[Lam, logS] = deal(zeros(numel(s), 1));
+for i = 1:numel(P)
+    [li, lsi] = survival(P{i}, s);
+    Lam = Lam + li;
+    logS = logS + lsi;
+end
 end
 
 % =========================================================================
-function [x, w] = nodes(d, n, bounds)
+function [x, w, u] = nodes(d, n, bounds)
 % mid-point quantiles of a truncated descriptor; equal weights
 if strcmp(d.kind, 'const')
-    x = d.value; w = 1; return
+    x = d.value; w = 1; u = 0.5; return
 end
 lo = bounds(1); hi = bounds(2);
 Flo = 0; Fhi = 1;

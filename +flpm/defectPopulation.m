@@ -44,6 +44,9 @@ function pop = defectPopulation(type, varargin)
 %                       flpm.fitClustering: Thomas cluster process for the
 %                       locations; the count stays the mean total number of
 %                       defects. [] = independent (Poisson) locations     [[]]
+%     'Copula'          volumetric: dependence of size and depth,
+%                       {'Gaussian', rho}, {'t', rho, nu} or the output of
+%                       flpm.testDependence; [] = independent            [[]]
 %     'Name'            label                                           [type]
 %
 %   See also flpm.samplePopulation, flpm.monteCarlo, flpm.roughnessShielding,
@@ -64,6 +67,7 @@ ip.addParameter('SizeBounds', [1e-6 Inf]);
 ip.addParameter('DepthBounds', [0 Inf]);
 ip.addParameter('ShieldingFactor', 1.12, @(x) isscalar(x) && x > 0);
 ip.addParameter('Clustering', []);
+ip.addParameter('Copula', []);
 ip.addParameter('Name', type);
 ip.parse(varargin{:});
 r = ip.Results;
@@ -98,6 +102,11 @@ if ~isempty(r.Clustering)
             '''Clustering'' must come from flpm.clustering or flpm.fitClustering.');
     end
     pop.clustering = c;
+end
+pop.copula = flpm.internal.toCopula(r.Copula);
+if ~isempty(pop.copula) && (~strcmp(type, 'volumetric') || ~isempty(pop.clustering))
+    error('flpm:population:copula', ...
+        'A size-depth copula needs a volumetric population without clustering.');
 end
 switch type
     case 'volumetric'

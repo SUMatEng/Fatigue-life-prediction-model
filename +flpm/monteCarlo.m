@@ -27,6 +27,7 @@ function [T, sets] = monteCarlo(pops, mat, varargin)
 %     killerSpacing (edge-to-edge distance to the nearest defect, mm),
 %     nEval, runtime (s)
 %   An empty defect set is assigned mat.dSigma_e, status 'noDefects'.
+%   With mat.dKth_cov > 0, each simulation draws its own dKth_lc.
 
 ip = inputParser;
 ip.addParameter('SurfaceLength', []);
@@ -79,6 +80,7 @@ if sampleInside
         'AxialLength', Lz, 'Seed', seed);
 end
 n = numel(set.size);
+mat = flpm.internal.thresholdDraw(mat, seed, k);   % specimen-to-specimen scatter
 row = struct('stress', mat.dSigma_e, 'converged', true, 'stepInSN', false, ...
     'N', Inf, 'status', "noDefects", 'nDefects', n, 'killer', NaN, ...
     'killerPopulation', NaN, 'killerSize', NaN, 'killerDepth', NaN, ...

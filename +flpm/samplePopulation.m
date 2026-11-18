@@ -82,8 +82,16 @@ for j = 1:numel(pops)
         sz = flpm.internal.sampleDescriptor(p.size, n, p.sizeBounds, rs) + p.sizeOffset;
     else
         if strcmp(p.countModel, 'poisson'), n = poissinv(rand(rs), mu); else, n = round(mu); end
-        sz = flpm.internal.sampleDescriptor(p.size, n, p.sizeBounds, rs) + p.sizeOffset;
-        if strcmp(p.type, 'volumetric')
+        if isfield(p, 'copula') && ~isempty(p.copula)
+            U = flpm.internal.copulaDraw(p.copula, n, rs);
+            sz = flpm.internal.descriptorIcdf(p.size, U(:, 1), p.sizeBounds) + p.sizeOffset;
+            dep = flpm.internal.descriptorIcdf(p.depth, U(:, 2), p.depthBounds);
+        else
+            sz = flpm.internal.sampleDescriptor(p.size, n, p.sizeBounds, rs) + p.sizeOffset;
+        end
+        if isfield(p, 'copula') && ~isempty(p.copula)
+            % depth drawn with the size
+        elseif strcmp(p.type, 'volumetric')
             dep = flpm.internal.sampleDescriptor(p.depth, n, p.depthBounds, rs);
         else
             dep = zeros(n, 1);
