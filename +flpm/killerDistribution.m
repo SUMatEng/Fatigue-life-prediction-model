@@ -57,11 +57,11 @@ end
 
 function r = ks(xo, T)
 xo = sort(xo(:)); n = numel(xo);
-Fp = @(x) interp1([-Inf; T.x], [0; T.cdf], x, 'previous', 1);
+c = [0; T.cdf];
+Fm = c(1 + sum(T.x.' <= xo, 2));      % predicted cdf at x
+Fl = c(1 + sum(T.x.' < xo, 2));       % and just below x
 Fo = (1:n)' / n;
-Fm = Fp(xo);
-Fl = arrayfun(@(x) interp1([-Inf; T.x], [0; T.cdf], x - eps(x), 'previous', 1), xo);
-D = max([Fo - Fm; Fm - Fo + 1/n; Fl - (0:n-1)'/n]);
+D = max([Fo - Fm; Fl - (0:n-1)'/n]);
 D = max(D, 0);
 % asymptotic Kolmogorov p-value with Stephens' small-sample correction
 lam = (sqrt(n) + 0.12 + 0.11/sqrt(n)) * D;
