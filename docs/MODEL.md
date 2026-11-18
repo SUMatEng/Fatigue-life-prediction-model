@@ -149,6 +149,28 @@ and its difference from Monte Carlo measures the effect of interaction.
   stress over the defect. For gradients that vary over a defect size, use
   a weight-function K. That is not implemented.
 
+## Validation against S–N data and fractography
+
+`flpm.fitSN` fits the random fatigue-limit model of Pascual & Meeker
+(Technometrics 41 (1999) 277) by maximum likelihood, with run-outs
+right-censored:
+
+```
+ln N = b0 + b1 ln(Δσ − γ) + ε,   ε ~ N(0, s²),   N = ∞ if Δσ ≤ γ
+```
+
+γ is either lognormal with fitted parameters, or fixed to the defect
+model's fatigue-strength distribution (`'FatigueLimit', W`). In the second
+case only b0, b1 and s are free, so `flpm.compareSN` (AIC, likelihood
+ratio) tests whether the S–N data support the predicted fatigue-limit
+scatter. The life model here is statistical; the defect model's own
+finite-life prediction is stage 5.
+
+`flpm.killerDistribution` gives the predicted killer √area and depth
+distributions, from the weakest-link killer probabilities or the Monte
+Carlo killers. With fractographic data it adds one-sample
+Kolmogorov–Smirnov tests.
+
 ## Defect clustering (Thomas process)
 
 Defect locations are by default independent (a Poisson process). A

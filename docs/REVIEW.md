@@ -107,6 +107,28 @@ of strength in MPa:
   (Sections above).
 
 
+### Validation tools: first use (18 Nov 2026)
+
+The S–N data of the XCT-characterised bars are not in the repository or
+the project files. `S_N_data_TB.m` holds as-fabricated Ti-6Al-4V data
+from this group (14 tests, amplitude given, no run-outs, R not stated)
+and literature data. As a demonstration only, Wycisk et al. (as quoted
+there: 14 tests, R = 0.1, four run-outs at 10⁷) was used:
+
+* Free fit: median fatigue limit 185 MPa (s_g = 0.08).
+* Fatigue limit fixed to the model prediction for the [M] volumes
+  (medians 304, 277 and 279 MPa): strongly rejected (ΔAIC −52 to −2800).
+  Run-outs at 175–198 MPa cannot coexist with a predicted limit near
+  280 MPa.
+
+This is a different material batch, so it does not validate or
+invalidate the model. It does show that the current fatigue-limit
+predictions sit well above typical as-built PBF-LB Ti-6Al-4V run-out
+levels. They are also above the published [M] values (222/180/158 MPa).
+The predicted killer √area (median 0.061–0.079 mm) and depth (median
+0.26–0.32 mm) are ready for comparison with fractography.
+
+
 Scope: the 2023 scripts in this repository, the February 2025 versions in the
 2024_DefectPopulation project (`Nasgro.m`, `multi_coalition_version3.m`,
 `Command_script.m`), and the two papers:
