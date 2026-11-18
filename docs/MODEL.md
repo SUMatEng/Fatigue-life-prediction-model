@@ -118,6 +118,43 @@ by BS 7910.
 * 'legacy' and 'paper' presets, the fminsearch solver, fixed 100-cycle
   stepping, and creep growth of arrested cracks.
 
+## Defect clustering (Thomas process)
+
+Defect locations are by default independent (a Poisson process). A
+population can instead be clustered with `'Clustering', flpm.clustering(...)`
+(a Thomas / Neyman–Scott process):
+
+* Cluster centres form a Poisson process of intensity κ. Their depth comes
+  from `ParentDepth` (default: the population's `Depth`). Their positions
+  are uniform along the surface and along the axis.
+* Each centre has Poisson(μ) defects (for a `'fixed'` count, the fixed
+  total is shared multinomially among round(λ/μ) centres).
+* Offsets are Gaussian with spread σ_plane in the cross-section (depth and
+  position along the surface) and σ_axial along the load axis. Positions
+  wrap around SurfaceLength and AxialLength, and depths are reflected at
+  the surface.
+* The population count stays the mean total λ, so κ = λ/μ. Sizes and
+  other marks are drawn per defect, independently of location.
+
+`flpm.fitClustering` estimates the process from measured centres:
+
+* Ripley's K with translation edge correction for disc, box or cylinder
+  windows. In 3D it uses the cylindrical K(r, t), which separates the
+  in-plane and axial spreads:
+  K(r, t) = 2tπr² + (1 − e^(−r²/4σp²)) erf(t/2σa)/κ.
+* Minimum-contrast fit (Diggle, exponent 0.25) of κ and σ, with
+  μ = λ/κ.
+* Validation by a Monte Carlo deviation test on the border-corrected
+  nearest-neighbour distribution G(r), against the fitted Thomas process
+  and against Poisson.
+* Mark tests: a random-labelling permutation test of nearest-neighbour size
+  correlation, and the Spearman correlation of size with depth.
+
+**Thinning.** Keeping only defects above a size threshold, with
+independent sizes, leaves κ and σ unchanged and scales μ by the retained
+fraction. A fit made on all detected pores must therefore be thinned
+before it is used for a population of only the largest defects.
+
 ## Statistical sample size
 
 `SurfaceLength` (mm) is the free-surface length that one Monte Carlo

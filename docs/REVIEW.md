@@ -39,6 +39,53 @@ along it. Results are median and interquartile range, in MPa:
   severity beyond what volume 2 already has.
 
 
+### Defect clustering (18 Nov 2026)
+
+Fits with `flpm.fitClustering`:
+
+| Data | n | Window | κ | μ | σ (mm) | G test p (Thomas / Poisson) |
+|---|---|---|---|---|---|---|
+| Ti64 XCT behind [M] (`XCTdefects.xlsx`) | 98 | disc R 2.55 mm (0.1 mm slab, treated as 2D) | = λ (4.8 /mm²) | 1.0 | – | 0.055 / 0.075 |
+| NTU XY export (3D) | 27 541 | cylinder R 2.3 mm × 8.4 mm | 3.4 /mm³ | 58 | 0.34 in-plane, 0.22 axial | 0.025 / 0.025 |
+| NTU ZX export (3D) | 9 451 | cylinder R 2.3 mm × 8.7 mm | (degenerate) | – | in-plane at the cap, 0.18 axial | 0.63 / 0.025 |
+
+* **Ti64 XCT:** there is no detectable clustering. Complete spatial
+  randomness is not rejected, the fit collapses to μ = 1, and size is
+  uncorrelated with depth (ρ = 0.09, p = 0.38) and with the size of the
+  nearest neighbour (p = 0.12). With 98 defects in one thin slab, the
+  power of these tests is low.
+* **NTU XY:** K exceeds the Poisson value by 15–25% between 0.1 and 0.5 mm,
+  a mild clustering on the 0.3 mm scale. Below about 0.05 mm, G lies below
+  both models (inhibition: pores do not overlap, and segmentation merges
+  close pores). Neither the Thomas nor the Poisson process reproduces that
+  range.
+* **NTU ZX:** the excess pair density comes from banding along the
+  specimen axis (σ_axial ≈ 0.18 mm), not from compact clusters. A Thomas
+  process is a poor description of it, and a layered (Cox) intensity
+  would fit better.
+* **Thinning:** the NTU fits cover all detected pores (about 200 /mm³).
+  The [M] sets keep only the 9–15 largest defects per simulation, i.e.
+  about 0.2–0.3 /mm³ in the near-surface shell. With κ = 3.4 /mm³ the
+  thinned mean cluster size is ≪ 1, so this clustering does not carry
+  over to the largest defects. That would change if the large pores
+  themselves cluster.
+
+Strength (median and IQR, MPa), with the [M] sets resampled from their
+pooled size and depth, SurfaceLength 22.9 mm, AxialLength 2 mm, BS 7910
+interaction in 3D, 200 simulations:
+
+| Volume | Poisson | Thomas μ = 3, σ = [0.34 0.22] mm | One cluster, σ = [0.34 0.22] mm |
+|---|---|---|---|
+| 1 (9 defects) | 304 (288–312) | 283 (250–305) | 275 (247–302) |
+| 2 (12 defects) | 279 (267–285) | 234 (219–253) | 233 (212–254) |
+| 3 (15 defects) | 279 (272–284) | 232 (215–253) | 226 (205–244) |
+
+If the largest defects cluster on the scale seen in the NTU data, the
+median falls by 20–50 MPa and the lower quartile by 40–65 MPa. The drop
+comes almost entirely from BS 7910 interaction. Most of it appears as soon
+as clusters of three form.
+
+
 Scope: the 2023 scripts in this repository, the February 2025 versions in the
 2024_DefectPopulation project (`Nasgro.m`, `multi_coalition_version3.m`,
 `Command_script.m`), and the two papers:
