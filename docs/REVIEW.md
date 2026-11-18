@@ -39,6 +39,26 @@ along it. Results are median and interquartile range, in MPa:
   severity beyond what volume 2 already has.
 
 
+### Interaction factor vs BS 7910 (18 Nov 2026)
+
+The published XCT sets (200 per set) were rerun with the continuous
+interaction factor and link-up on contact. They are compared with the
+BS 7910 combination rules. Values are Δσ_w in MPa, given as median (P10).
+
+| Set | Planar, BS 7910 | Planar, interaction factor | 2 mm axial spread, BS 7910 | 2 mm axial spread, interaction factor |
+|---|---|---|---|---|
+| 1 | 292.0 (245.7) | 301.3 (250.2) | 304.7 (249.9) | 304.8 (250.9) |
+| 2 | 257.0 (220.4) | 272.3 (226.3) | 277.7 (227.5) | 278.4 (227.5) |
+| 3 | 258.7 (214.3) | 271.9 (243.7) | 279.1 (256.5) | 279.3 (261.2) |
+
+When all defects are in one plane, BS 7910 merges flaws across gaps.
+That gives 9–15 MPa lower medians and up to 29 MPa lower P10, which is
+the conservatism the ORNL report notes. With a realistic 2 mm axial
+spread, the two methods agree to within 1 MPa in the median, because few
+pairs are close enough for either. The interaction factor therefore
+matters mainly for clustered or banded porosity. Its cost was about 18 min
+for the 600 planar sets on 9 workers.
+
 ### Defect clustering (18 Nov 2026, revised)
 
 Fits with `flpm.fitClustering`:
