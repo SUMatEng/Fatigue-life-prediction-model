@@ -40,8 +40,8 @@ they are altered.
 `Output1–3.xlsx` (the source of [M] Table 5: median and IQR of the converged
 rows) are **not** reproduced by the Feb 2025 `Nasgro.m`, nor by the Aug 2024
 `MATLAB scripts 2024/Nasgro_many_01.m`, with either 2.4/1026 or 2.7/1150.
-The current code is never lower than the published value and is 20–120 MPa
-higher for about half the rows.
+The current code is never lower than the published value and is markedly
+higher (up to ~140 MPa) for about 75 % of the rows.
 
 **Cause.** The 2024 `multi_coalition_version3.m` has the specimen diameter as
 its last argument, but `Nasgro_many_01.m` does not pass it. The commented line
@@ -53,7 +53,7 @@ N = 0.996–1.008 × 10⁷ at the published stress for every mismatched row test
 (Output1 rows 1, 5, 10, 33, 34). With D = 7.3 mm, nothing grows at those
 stresses. Defects with centres 0.1–0.4 mm below the surface are then
 classified and magnified against a free surface 0.1 mm closer than the
-specimen's, which lowers their strength by up to ~120 MPa.
+specimen's, which lowers their strength by up to ~140 MPa.
 
 **Regenerated Table 5** (all 200 sets per volume; D = 7.3 mm throughout;
 median and interquartile range, MPa):
