@@ -35,34 +35,38 @@ change the strength by +0 to +5.5 MPa (median ≈ +3 MPa) in the 30-set
 validation below. Items 3–13 change the physics and need your decision before
 they are altered.
 
-## 2. Published results are not reproduced by the current code
+## 2. Published results: cause of the discrepancy found
 
-`Output1–3.xlsx` (the source of [M] Table 5) were rerun with the Feb 2025
-`Nasgro.m` on the same `sim_XCT_*` defect sets, with both 2.4/1026 and
-2.7/1150:
+`Output1–3.xlsx` (the source of [M] Table 5: median and IQR of the converged
+rows) are **not** reproduced by the Feb 2025 `Nasgro.m`, nor by the Aug 2024
+`MATLAB scripts 2024/Nasgro_many_01.m`, with either 2.4/1026 or 2.7/1150.
+The current code is never lower than the published value and is 20–120 MPa
+higher for about half the rows.
 
-* About half of the rows match to < 1 MPa (rows 3, 4, 7, 8, 13, 14, 19 of
-  Output1, …). The rest give **2–82 MPa higher** strengths (e.g. row 1:
-  published 201 MPa, current code 254 MPa). At the published stress, rows 1–2
-  give no growth or a run-out, so the published value is not a solution of
-  this code.
-* No pattern by surface/near-surface classification was found.
+**Cause.** The 2024 `multi_coalition_version3.m` has the specimen diameter as
+its last argument, but `Nasgro_many_01.m` does not pass it. The commented line
+`%D=(7.1/1000)` in that function indicates that the outputs were produced
+with **D = 7.1 mm inside the coalescence/geometry-factor routine**, while the
+rest of the model (net-section stress, K, failure checks) used 7.3 mm. With
+D = 7.1 mm in `multi_coalition_version3` only, the 2024 code returns
+N = 0.996–1.008 × 10⁷ at the published stress for every mismatched row tested
+(Output1 rows 1, 5, 10, 33, 34). With D = 7.3 mm, nothing grows at those
+stresses. Defects with centres 0.1–0.4 mm below the surface are then
+classified and magnified against a free surface 0.1 mm closer than the
+specimen's, which lowers their strength by up to ~120 MPa.
 
-Conclusion: Output1–3 were generated with a different code version (or
-different inputs) from the one in the repository. Before the `+flpm` results
-are compared with [M], the version used for the paper should be located.
+**Regenerated Table 5** (all 200 sets per volume; D = 7.3 mm throughout;
+median and interquartile range, MPa):
 
-Validation, first 30 defect sets of each XCT volume (`'legacy'` physics with
-adaptive stepping and bracket solver, and `'paper'` preset):
+| Volume | Published [M] (converged rows) | `legacy` physics | `paper` preset |
+|---|---|---|---|
+| 1 (9 defects) | 222 (159–262) | 258 (242–278) | 262 (245–283) |
+| 2 (12 defects) | 180 (149–203) | 235 (212–248) | 238 (214–252) |
+| 3 (15 defects) | 158 (143–186) | 220 (202–242) | 221 (203–246) |
 
-| Volume | Published median, 30 sets | `legacy` median | `paper` median | Rows within 2 MPa of published |
-|---|---|---|---|---|
-| dist1 | 229.0 | 254.0 | 257.9 | 11/30 |
-| dist2 | 191.5 | 237.3 | 240.5 | 4/30 |
-| dist3 | 172.2 | 218.7 | 218.8 | 1/30 |
-
-The full sets (200 per volume) were not run, on request; at about 1 s per
-set they take about 3–4 min per volume per preset on 10 workers.
+All 600 sets converge with the bracket solver. In 52, 54 and 79 sets per
+volume the strength is a step in N_f(Δσ) (arrest just below it). Runtime: about
+20 s per 200 sets on 10 workers.
 
 ## 3. Single-defect check (`sanbox_multi`)
 
