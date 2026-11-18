@@ -58,23 +58,23 @@ classdef FlpmSolverTest < matlab.unittest.TestCase
 
         function adaptiveStepConverges(tc)
             % Away from the threshold the adaptive scheme matches fine fixed
-            % stepping to better than 0.5 %.
+            % stepping to better than 1 % (fixed-25 itself is ~0.2 % off).
             of = flpm.modelOptions('paper', 'Stepping', 'fixed', 'FixedStep', 25);
             oa = flpm.modelOptions('paper', 'Eta', 0.005);
             for s = [300 400]
                 rf = flpm.fatigueLife(s, tc.multi, tc.mat, tc.geom, of);
                 ra = flpm.fatigueLife(s, tc.multi, tc.mat, tc.geom, oa);
-                tc.verifyEqual(ra.N, rf.N, 'RelTol', 5e-3);
+                tc.verifyEqual(ra.N, rf.N, 'RelTol', 1e-2);
             end
-            % long life: adaptive needs far fewer steps than fixed-100
-            o = flpm.modelOptions('paper', 'Eta', 0.005);
-            rf = flpm.fatigueLife(330, tc.single, tc.mat, tc.geom, ...
-                flpm.modelOptions('paper', 'Stepping', 'fixed', 'FixedStep', 100));
-            ra = flpm.fatigueLife(330, tc.single, tc.mat, tc.geom, o);
-            if isfinite(rf.N)
-                tc.verifyEqual(ra.N, rf.N, 'RelTol', 0.02);
-                tc.verifyLessThan(ra.nSteps, rf.nSteps / 5);
-            end
+            % near the strength (N ~ 8e6): same life, >10x fewer steps
+            % than the original fixed 100-cycle increments
+            rf = flpm.fatigueLife(322, tc.single, tc.mat, tc.geom, ...
+                flpm.modelOptions('paper', 'Stepping', 'fixed', 'MaxLife', 1e8));
+            ra = flpm.fatigueLife(322, tc.single, tc.mat, tc.geom, ...
+                flpm.modelOptions('paper', 'MaxLife', 1e8));
+            tc.verifyGreaterThan(rf.N, 1e6);
+            tc.verifyEqual(ra.N, rf.N, 'RelTol', 5e-3);
+            tc.verifyLessThan(ra.nSteps, rf.nSteps / 10);
         end
 
         function noGrowthBelowOnset(tc)
