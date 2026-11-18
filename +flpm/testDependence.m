@@ -7,8 +7,9 @@ function D = testDependence(sz, depth)
 %   Rank correlations (Spearman, Kendall) with their p-values, and maximum-
 %   likelihood Gaussian and t copulas fitted to the pseudo-observations
 %   (ranks/(n+1)), compared with independence by AIC and a likelihood-
-%   ratio test. D.copula is the copula with the lowest AIC, or [] if
-%   independence has the lowest AIC; D.warranted says which.
+%   ratio test. D.copula is the copula with the lowest AIC if it beats
+%   independence by AIC and its likelihood-ratio test at the 5% level
+%   (D.warranted); otherwise [].
 %
 %   Output struct
 %     n, spearman [rho p], kendall [tau p]
@@ -41,7 +42,9 @@ catch
 end
 D.aicIndependent = 0;
 [best, k] = min([0, D.gaussian.aic, D.t.aic]);
-D.warranted = k > 1 && best < 0;
+pk = [1, D.gaussian.pLR, D.t.pLR];
+D.warranted = k > 1 && best < 0 && pk(k) < 0.05;
+if ~D.warranted, k = 1; end
 switch k
     case 1, D.copula = [];
     case 2, D.copula = struct('family', 'gaussian', 'rho', D.gaussian.rho, 'nu', Inf);
