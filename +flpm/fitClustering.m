@@ -43,6 +43,17 @@ function fit = fitClustering(xyz, varargin)
 %     'NumPermutations' permutations for the mark test                 [999]
 %     'Sizes', 'Depth'  marks, n x 1
 %     'Seed'                                                              [0]
+%     'Intensity'       [] homogeneous; 'radial' (disc/cylinder: kernel
+%                       estimate of lambda against distance from the axis,
+%                       e.g. near-surface porosity); or a handle lambda(x).
+%                       The K function is then the inhomogeneous
+%                       (intensity-reweighted) K of Baddeley, Moller &
+%                       Waagepetersen (Stat. Neerl. 54 (2000) 329), the
+%                       Thomas fit is the inhomogeneous Thomas process of
+%                       Waagepetersen (Biometrics 63 (2007) 252), and the
+%                       G-test simulations are thinned to lambda(x). The
+%                       cluster term then measures clustering beyond what
+%                       the intensity gradient explains.
 %
 %   Output struct (lengths in mm)
 %     dim, n, volume, lambda    data and intensity (per mm^2 or mm^3)
@@ -71,6 +82,7 @@ ip.addParameter('NumPermutations', 999);
 ip.addParameter('Sizes', []);
 ip.addParameter('Depth', []);
 ip.addParameter('Seed', 0);
+ip.addParameter('Intensity', []);
 ip.parse(varargin{:});
 o = ip.Results;
 
@@ -83,13 +95,21 @@ if dim == 3                     % put the axial column last
 end
 W = makeWindow(xyz, o);
 lambda = n / W.volume;
+lamFun = intensityFunction(o.Intensity, xyz, W);
+li = [];
+if ~isempty(lamFun)
+    li = lamFun(xyz);
+    c = sum(1 ./ li) / W.volume;          % so that sum(1/lambda_i) = |W|
+    lamFun = @(x) c * lamFun(x);
+    li = c * li;
+end
 rmax = o.RMax;
 if isempty(rmax), rmax = 0.25 * W.minExtent; end
 r = linspace(rmax / o.NumR, rmax, o.NumR)';
 rs = RandStream('mrg32k3a', 'Seed', o.Seed);
 
 % ---- 1. K function ------------------------------------------------------
-Khat = kEstimate(xyz, W, r);
+Khat = kEstimate(xyz, W, r, li);
 % ---- 2. minimum contrast -----------------------------------------------
 cpow = 0.25;
 iso = dim == 2 || o.Isotropic;
@@ -133,12 +153,20 @@ end
 
 % ---- 3. nearest-neighbour validation -----------------------------------
 rg = linspace(0, rmax, 60)';
+if ~isempty(lamFun)
+    lamMax = 1.05 * max(lamFun(uniformIn(W, 20000, rs)));
+end
 Gobs = gEstimate(xyz, W, rg);
 nS = o.NumSimulations;
 GT = zeros(numel(rg), nS); GP = GT;
 for k = 1:nS
-    GT(:, k) = gEstimate(simThomas(kappa, mu, sigma, W, rs), W, rg);
-    GP(:, k) = gEstimate(simPoisson(lambda, W, rs), W, rg);
+    if isempty(lamFun)
+        GT(:, k) = gEstimate(simThomas(kappa, mu, sigma, W, rs), W, rg);
+        GP(:, k) = gEstimate(simPoisson(lambda, W, rs), W, rg);
+    else            % independent thinning of homogeneous processes at lambda_max
+        GT(:, k) = gEstimate(thin(simThomas(kappa, lamMax / kappa, sigma, W, rs), lamFun, lamMax, rs), W, rg);
+        GP(:, k) = gEstimate(thin(simPoisson(lamMax, W, rs), lamFun, lamMax, rs), W, rg);
+    end
 end
 [fit.pThomas, mT] = devTest(Gobs, GT);
 [fit.pPoisson, mP] = devTest(Gobs, GP);
@@ -215,19 +243,21 @@ I = I(keep); J = J(keep);
 dx = xyz(J, :) - xyz(I, :);
 end
 
-function K = kEstimate(xyz, W, r)
+function K = kEstimate(xyz, W, r, li)
 [n, dim] = size(xyz);
 rmax = r(end);
 if dim == 2
-    [~, ~, dx] = closePairs(xyz, rmax);
+    [I, J, dx] = closePairs(xyz, rmax);
     w = W.volume ./ overlap(W, dx);
+    if ~isempty(li), w = w ./ (li(I) .* li(J)); end
     d = hypot(dx(:, 1), dx(:, 2));
     [~, b] = histc(d, [0; r]); %#ok<HISTC>
     ok = b > 0;
     K = cumsum(accumarray(b(ok), w(ok), [numel(r) 1]));
 else
-    [~, ~, dx] = closePairs(xyz, sqrt(2) * rmax);
+    [I, J, dx] = closePairs(xyz, sqrt(2) * rmax);
     w = W.volume ./ overlap(W, dx);
+    if ~isempty(li), w = w ./ (li(I) .* li(J)); end
     dp = hypot(dx(:, 1), dx(:, 2));
     dz = abs(dx(:, 3));
     [~, bp] = histc(dp, [0; r]); %#ok<HISTC>
@@ -236,7 +266,35 @@ else
     H = accumarray([bp(ok) bz(ok)], w(ok), [numel(r) numel(r)]);
     K = cumsum(cumsum(H, 1), 2);          % K(r_i, t_j)
 end
-K = K * W.volume / (n * (n - 1));
+if isempty(li)
+    K = K * W.volume / (n * (n - 1));
+else
+    K = K / W.volume;                     % intensity-reweighted (inhomogeneous) K
+end
+end
+
+function f = intensityFunction(spec, xyz, W)
+% [] (homogeneous), a handle lambda(x), or 'radial': kernel estimate of
+% the intensity as a function of the distance from the axis (disc or
+% cylinder windows), lambda(r) = n f(r) / (2 pi r [h])
+f = [];
+if isempty(spec), return, end
+if isa(spec, 'function_handle'), f = spec; return, end
+if ~strcmpi(spec, 'radial') || ~any(strcmp(W.type, {'disc', 'cylinder'}))
+    error('flpm:fitClustering:intensity', '''Intensity'', ''radial'' needs a disc or cylinder window.');
+end
+rr = hypot(xyz(:, 1), xyz(:, 2));
+n = numel(rr);
+[~, ~, bw] = ksdensity(rr, 'Support', [0 W.R * (1 + 1e-9)], 'BoundaryCorrection', 'reflection');
+h = 1;
+if strcmp(W.type, 'cylinder'), h = W.hi(3) - W.lo(3); end
+f = @(x) n * ksdensity(rr, min(hypot(x(:, 1), x(:, 2)), W.R), 'Support', [0 W.R * (1 + 1e-9)], ...
+    'BoundaryCorrection', 'reflection', 'Bandwidth', bw) ./ (2 * pi * max(hypot(x(:, 1), x(:, 2)), bw) * h);
+end
+
+function x = thin(x, lamFun, lamMax, rs)
+if isempty(x), return, end
+x = x(rand(rs, size(x, 1), 1) < lamFun(x) / lamMax, :);
 end
 
 function K = kThomas(r, dim, kappa, sp, sa)

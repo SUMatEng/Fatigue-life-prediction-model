@@ -98,6 +98,26 @@ classdef FlpmClusteringTest < matlab.unittest.TestCase
             tc.verifyEqual(g.K.Khat(end), pi * 1.5^2, 'RelTol', 0.15);
         end
 
+        function inhomogeneousIntensityIsNotClustering(tc)
+            % Poisson points concentrated near the free surface of a bar
+            rs = RandStream('mrg32k3a', 'Seed', 9);
+            R = 3; h = 6; X = zeros(0, 3);
+            while size(X, 1) < 500
+                y = [2*R*rand(rs, 4000, 2) - R, h*rand(rs, 4000, 1)];
+                r = hypot(y(:,1), y(:,2));
+                keep = r <= R & rand(rs, 4000, 1) < exp(-(R - r) / 0.4);
+                X = [X; y(keep, :)]; %#ok<AGROW>
+            end
+            X = X(1:500, :);
+            fh = flpm.fitClustering(X, 'Cylinder', [R 0 h], 'RMax', 0.8, 'NumSimulations', 39);
+            fi = flpm.fitClustering(X, 'Cylinder', [R 0 h], 'RMax', 0.8, 'NumSimulations', 39, ...
+                'Intensity', 'radial');
+            tc.verifyLessThan(fh.pPoisson, 0.05);          % homogeneous null rejected
+            tc.verifyGreaterThan(fi.pPoisson, 0.05);       % inhomogeneous null not rejected
+            big = fi.K.r >= 0.4;
+            tc.verifyLessThan(max(abs(fi.K.Khat(big) ./ fi.K.Kpoisson(big) - 1)), 0.3);
+        end
+
         function markTests(tc)
             rs = RandStream('mrg32k3a', 'Seed', 7);
             X = 10 * rand(rs, 300, 2);
