@@ -94,8 +94,11 @@ Khat = kEstimate(xyz, W, r);
 cpow = 0.25;
 iso = dim == 2 || o.Isotropic;
 Kfun = @(q) kThomas(r, dim, exp(q(1)), exp(q(2)), exp(q(end)));
-obj = @(q) sum((Khat.^cpow - max(Kfun(q), 0).^cpow).^2, 'all') + ...
-    1e3 * max(0, q(1) - log(lambda))^2;          % kappa <= lambda (mu >= 1)
+sMax = W.minExtent;                               % spreads beyond the window
+obj = @(q) sum((Khat.^cpow - max(Kfun(q), 0).^cpow).^2, 'all') + ...  % are not identifiable
+    1e3 * max(0, q(1) - log(lambda))^2 + ...      % kappa <= lambda (mu >= 1)
+    1e3 * sum(max(0, q(2:end) - log(sMax)).^2) + ...
+    1e3 * max(0, log(lambda) - q(1) - log(n))^2;  % mu <= n
 q0s = log([lambda/5, rmax/4, rmax/4; lambda/20, rmax/10, rmax/10; lambda/2, rmax/2, rmax/2]);
 if iso, q0s = q0s(:, 1:2); end
 best = Inf;
@@ -105,7 +108,7 @@ for k = 1:size(q0s, 1)
     if f < best, best = f; qb = q; end
 end
 kappa = exp(qb(1));
-sigma = exp(qb(2:end));
+sigma = min(exp(qb(2:end)), sMax);
 if iso && dim == 3, sigma = [sigma sigma]; end
 mu = max(lambda / kappa, 1);
 
@@ -281,6 +284,7 @@ function x = simThomas(kappa, mu, sigma, W, rs)
 dim = numel(W.lo);
 s = repmat(sigma(1), 1, dim);
 if dim == 3, s(3) = sigma(end); end
+s = min(s, W.minExtent);
 lo = W.lo - 4 * s; hi = W.hi + 4 * s;
 np = poissinv(rand(rs), kappa * prod(hi - lo));
 P = lo + (hi - lo) .* rand(rs, np, dim);
