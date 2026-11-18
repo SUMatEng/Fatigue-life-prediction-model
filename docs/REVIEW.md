@@ -1,5 +1,35 @@
 # Code review and rebuild notes
 
+> **Status (18 Nov 2026).** At the owner's request the package now has a
+> single, diameter-free model in the Murakami √area framework; see
+> [MODEL.md](MODEL.md). Sections 1–5 below record the review of the
+> 2023–2025 code that led to it. Section 0 gives the current results.
+
+## 0. Current model on the published XCT defect sets
+
+The 600 defect sets behind [M] Table 5 were converted once from polar
+coordinates in the 7.3 mm bars to depth below the surface and arc length
+along it. Results are median and interquartile range, in MPa:
+
+| Volume | Published [M] | 2025 code, D = 7.3 mm, paper fixes | Current model |
+|---|---|---|---|
+| 1 (9 defects) | 222 (159–262) | 262 (245–283) | 303 (286–311) |
+| 2 (12 defects) | 180 (149–203) | 238 (214–252) | 274 (261–284) |
+| 3 (15 defects) | 158 (143–186) | 221 (203–246) | 278 (264–282) |
+
+* All 600 sets converge, in about 0.5 s per set.
+* **Every strength is a crack-arrest step.** Just below Δσ_w all cracks
+  arrest. Just above it the bar fails by K_IC after 3.5–5 × 10⁵ cycles.
+  Without the 1e-12 m/cycle creep of the old code, an arrested crack never
+  restarts. The model therefore predicts a fatigue limit (the
+  Kitagawa–El Haddad arrest stress) and gives no finite lives between about
+  5 × 10⁵ and 10⁷ cycles. In the old code that creep, accumulating about
+  10 µm over 10⁷ cycles, produced the lives near the target.
+* The volume ranking weakens. Volumes 2 and 3 are equal within their IQRs,
+  because the larger defect count of volume 3 no longer adds near-surface
+  severity beyond what volume 2 already has.
+
+
 Scope: the 2023 scripts in this repository, the February 2025 versions in the
 2024_DefectPopulation project (`Nasgro.m`, `multi_coalition_version3.m`,
 `Command_script.m`), and the two papers:
