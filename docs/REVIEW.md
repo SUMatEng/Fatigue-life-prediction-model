@@ -41,7 +41,7 @@ they are altered.
 rows) are **not** reproduced by the Feb 2025 `Nasgro.m`, nor by the Aug 2024
 `MATLAB scripts 2024/Nasgro_many_01.m`, with either 2.4/1026 or 2.7/1150.
 The current code is never lower than the published value and is markedly
-higher (up to ~140 MPa) for about 75 % of the rows.
+higher (by more than 2 MPa in 519 of 600 rows, up to ~140 MPa).
 
 **Cause.** The 2024 `multi_coalition_version3.m` has the specimen diameter as
 its last argument, but `Nasgro_many_01.m` does not pass it. The commented line
