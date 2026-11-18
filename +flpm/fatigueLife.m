@@ -25,7 +25,7 @@ function out = fatigueLife(stressRange, defects, mat, opts)
 %   (Kachanov's method, flpm.internal.interactionFactor); cracks whose
 %   projections touch link up and are re-characterised after BS 7910
 %   (flpm.internal.coalesce). The run ends with
-%     failure   Kmax >= KIC
+%     failure   Kmax >= KIC, with K not amplified by neighbours
 %     run-out   no crack can grow, or N > 1.02 * TargetLife
 %
 %   Output struct
@@ -70,7 +70,10 @@ while true
     Y = Y .* gam;                      % interaction amplifies or shields K
     S.dK = s * Y .* sqrt(pi * A);
 
-    if max(S.dK .* local(S, c, s)) >= mat.KIC
+    % fracture of the specimen: K of each crack without the amplification
+    % by its neighbours (amplified K >= KIC on the side facing a neighbour
+    % breaks the ligament, i.e. link-up, which growth then reaches)
+    if max(S.dK ./ max(gam, 1) .* local(S, c, s)) >= mat.KIC
         status = 'Kc';
         break
     end
