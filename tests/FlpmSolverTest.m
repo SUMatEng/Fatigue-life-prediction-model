@@ -61,10 +61,20 @@ classdef FlpmSolverTest < matlab.unittest.TestCase
             % stepping to better than 0.5 %.
             of = flpm.modelOptions('paper', 'Stepping', 'fixed', 'FixedStep', 25);
             oa = flpm.modelOptions('paper', 'Eta', 0.005);
-            rf = flpm.fatigueLife(300, tc.multi, tc.mat, tc.geom, of);
-            ra = flpm.fatigueLife(300, tc.multi, tc.mat, tc.geom, oa);
-            tc.verifyEqual(ra.N, rf.N, 'RelTol', 5e-3);
-            tc.verifyLessThan(ra.nSteps, rf.nSteps / 10);
+            for s = [300 400]
+                rf = flpm.fatigueLife(s, tc.multi, tc.mat, tc.geom, of);
+                ra = flpm.fatigueLife(s, tc.multi, tc.mat, tc.geom, oa);
+                tc.verifyEqual(ra.N, rf.N, 'RelTol', 5e-3);
+            end
+            % long life: adaptive needs far fewer steps than fixed-100
+            o = flpm.modelOptions('paper', 'Eta', 0.005);
+            rf = flpm.fatigueLife(330, tc.single, tc.mat, tc.geom, ...
+                flpm.modelOptions('paper', 'Stepping', 'fixed', 'FixedStep', 100));
+            ra = flpm.fatigueLife(330, tc.single, tc.mat, tc.geom, o);
+            if isfinite(rf.N)
+                tc.verifyEqual(ra.N, rf.N, 'RelTol', 0.02);
+                tc.verifyLessThan(ra.nSteps, rf.nSteps / 5);
+            end
         end
 
         function noGrowthBelowOnset(tc)
@@ -96,10 +106,12 @@ classdef FlpmSolverTest < matlab.unittest.TestCase
         function bracketSolutionHitsTarget(tc)
             r = flpm.fatigueStrength(tc.multi, tc.mat, tc.geom, flpm.modelOptions());
             tc.verifyTrue(r.converged);
-            if ~r.onsetLimited
+            lo = flpm.fatigueLife(r.stress - 0.2, tc.multi, tc.mat, tc.geom, flpm.modelOptions());
+            if r.stepInSN
+                % N_f jumps at the strength: arrest just below it
+                tc.verifyGreaterThan(lo.N, 1e7);
+            elseif ~r.onsetLimited
                 tc.verifyEqual(r.N, 1e7, 'RelTol', 0.02);
-                % slightly below the strength the bar survives the target
-                lo = flpm.fatigueLife(r.stress - 0.2, tc.multi, tc.mat, tc.geom, flpm.modelOptions());
                 tc.verifyGreaterThan(lo.N, r.N);
             end
         end

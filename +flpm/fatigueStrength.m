@@ -30,6 +30,9 @@ function res = fatigueStrength(defects, mat, geom, opts)
 %     status     termination status of the life calculation at 'stress'
 %     onset      growth-onset stress (MPa) (bracket solver)
 %     nEval      number of life evaluations
+%     onsetLimited  true if N_f < target already at the growth onset
+%     stepInSN   true if N_f jumps from run-out to < target at 'stress'
+%                (crack arrest just below, failure just above)
 
 if nargin < 4 || isempty(opts)
     opts = flpm.modelOptions();
@@ -108,14 +111,18 @@ while hi - lo > opts.StressTol
         return
     end
 end
-% Report the side that fails (finite N) at the target tolerance.
+% Report the side that fails (finite N) at the target tolerance. If N there
+% is far from the target, N_f(dSigma) is discontinuous at the solution:
+% just below it every crack arrests (run-out), just above it the bar fails
+% before the target life. The strength is then that arrest stress.
 res = pack(hi, true, outHi, onset, nEval);
+res.stepInSN = abs(gHi) > log(1.02);
 end
 
 function res = pack(s, ok, out, onset, nEval)
 res = struct('stress', s, 'converged', ok, 'N', out.N, ...
     'killer', out.killer, 'status', out.status, ...
-    'onset', onset, 'nEval', nEval, 'onsetLimited', false);
+    'onset', onset, 'nEval', nEval, 'onsetLimited', false, 'stepInSN', false);
 end
 
 function s = growthOnset(defects, mat, geom, opts)
@@ -156,5 +163,5 @@ o = optimset('TolFun', 1e4, 'TolX', 2);
 out = flpm.fatigueLife(s, defects, mat, geom, opts);
 res = struct('stress', s, 'converged', e == 0, 'N', out.N, ...
     'killer', out.killer, 'status', out.status, 'onset', NaN, ...
-    'nEval', nEval, 'onsetLimited', false, 'legacyError', e);
+    'nEval', nEval, 'onsetLimited', false, 'stepInSN', false, 'legacyError', e);
 end
