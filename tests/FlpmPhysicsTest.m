@@ -60,29 +60,60 @@ classdef FlpmPhysicsTest < matlab.unittest.TestCase
             tc.verifySize(flpm.roughnessShielding([0.01 0.02 0.05], 0.1), [1 3]);
         end
 
-        function coalescenceMergesByArea(tc)
-            a1 = 0.06e-3; a2 = 0.04e-3;
-            r = (a1 + a2)/sqrt(pi);
-            S = state([a1 a2], [0.5e-3 0.5e-3], [0 0.9*r]);
-            S.ext = [2e-6; 5e-6];
-            S.dK = [2; 1];
+        function bs7910SideBySideAndRecharacterisation(tc)
+            % two coplanar circular flaws at the same depth, gap 0.9 x the
+            % smaller length: interact; replaced by the containing rectangle
+            a1 = 0.06e-3; a2 = 0.04e-3; r1 = a1/sqrt(pi); r2 = a2/sqrt(pi);
+            gapS = 0.9 * 2*r2;
+            S = state([a1 a2], [0.5e-3 0.5e-3], [0, r1 + r2 + gapS]);
+            S.ext = [2e-6; 5e-6];  S.dK = [2; 1];
             [M, merged] = flpm.internal.coalesce(S);
             tc.verifyTrue(merged);
-            tc.verifyNumElements(M.a, 1);
-            tc.verifyEqual(M.a, hypot(a1, a2), 'RelTol', 1e-12);
-            tc.verifyEqual(M.s, a2^2*0.9*r/(a1^2 + a2^2), 'RelTol', 1e-12);
+            c = (2*r1 + 2*r2 + gapS)/2;  h = r1;          % half-length, half-height
+            tc.verifyEqual(M.a, sqrt(pi*c*h), 'RelTol', 1e-12);
+            tc.verifyEqual(M.s, -r1 + c, 'RelTol', 1e-12);
             tc.verifyEqual(M.ext, 5e-6);
             tc.verifyEqual(M.id, 1);
+            % beyond the smaller length: independent
+            S = state([a1 a2], [0.5e-3 0.5e-3], [0, r1 + r2 + 1.1*2*r2]);
+            [~, merged] = flpm.internal.coalesce(S);
+            tc.verifyFalse(merged);
+        end
+
+        function bs7910StackedInDepth(tc)
+            a = 0.05e-3; r = a/sqrt(pi);
+            S = state([a a], [0.5e-3, 0.5e-3 + 2*r + 0.95*2*r]);   % gap 0.95 (a1+a2)
+            [~, merged] = flpm.internal.coalesce(S);
+            tc.verifyTrue(merged);
+            S = state([a a], [0.5e-3, 0.5e-3 + 2*r + 1.05*2*r]);
+            [~, merged] = flpm.internal.coalesce(S);
+            tc.verifyFalse(merged);
+            % diagonal offset (neither side by side nor stacked): independent
+            S = state([a a], [0.5e-3, 0.5e-3 + 2.5*r], [0, 2.5*r]);
+            [~, merged] = flpm.internal.coalesce(S);
+            tc.verifyFalse(merged);
+        end
+
+        function bs7910NonCoplanarAlignment(tc)
+            a = 0.05e-3; r = a/sqrt(pi);
+            S = state([a a], [0.5e-3 0.5e-3], [0 0]);
+            S.y = [0; 0.9*2*r];                  % planes closer than 0.5(l1 + l2)
+            [M, merged] = flpm.internal.coalesce(S);
+            tc.verifyTrue(merged);
+            tc.verifyEqual(M.y, 0.9*r, 'RelTol', 1e-12);
+            S.y = [0; 1.1*2*r];
+            [~, merged] = flpm.internal.coalesce(S);
+            tc.verifyFalse(merged);
         end
 
         function coalescenceIsTransitive(tc)
-            a = 0.05e-3; d = 1.9*a/sqrt(pi);
+            a = 0.05e-3; r = a/sqrt(pi); d = 3.5*r;    % 1-2, 2-3 interact; 1-3 not
             S = state([a a a], [1e-3 1e-3 1e-3], [0 d 2*d]);
             S.dK = [1; 3; 2];
             M = flpm.internal.coalesce(S);
             tc.verifyNumElements(M.a, 1);
             tc.verifyEqual(M.id, 2);
-            tc.verifyEqual(M.a, sqrt(3)*a, 'RelTol', 1e-12);
+            tc.verifyEqual(M.a, sqrt(pi*(r + d)*r), 'RelTol', 1e-12);
         end
 
         function noCoalescenceWhenApart(tc)
@@ -99,6 +130,6 @@ function S = state(a, z, s)
 % Solver state (SI) from vectors of sqrt(area), depth and position.
 if nargin < 3, s = zeros(size(a)); end
 n = numel(a);
-S = struct('a', a(:), 'z', z(:), 's', s(:), 'ext', zeros(n,1), ...
+S = struct('a', a(:), 'z', z(:), 's', s(:), 'y', zeros(n,1), 'ext', zeros(n,1), ...
     'id', (1:n)', 'dK', zeros(n,1));
 end

@@ -20,8 +20,9 @@ function out = fatigueLife(stressRange, defects, mat, opts)
 %   (flpm.internal.stressIntensity), U from Newman's closure function and
 %   l the difference of the El Haddad lengths of dKth,lc and dKth,eff
 %   (Y = 0.65). A crack grows once F2*dK >= dKth,eff with
-%   F2 = 1 - (1 - U)(1 - exp(-Da/l)); below dKth it is arrested. Discs that
-%   touch coalesce. The run ends with
+%   F2 = 1 - (1 - U)(1 - exp(-Da/l)); below dKth it is arrested. Flaws that
+%   interact by the BS 7910 rules are re-characterised as one flaw
+%   (flpm.internal.coalesce). The run ends with
 %     failure   Kmax >= KIC
 %     run-out   no crack can grow, or N > 1.02 * TargetLife
 %
@@ -100,7 +101,7 @@ out.status = status;
 out.killer = S.id(k);
 out.nSteps = nSteps;
 out.final = struct('size', S.a * 1e3, 'depth', S.z * 1e3, ...
-    'position', S.s * 1e3, 'extension', S.ext * 1e3, 'id', S.id);
+    'position', S.s * 1e3, 'axial', S.y * 1e3, 'extension', S.ext * 1e3, 'id', S.id);
 if opts.RecordHistory
     h = hist(1:min(nSteps, size(hist, 1)), :);
     h = h(h(:,1) > 0, :);
@@ -152,10 +153,17 @@ vr = rate / sqrt(pi);
 small = 0.01 * eta * r;
 n = numel(S.a);
 if n > 1
-    gap = hypot(S.s - S.s.', S.z - S.z.') - (r + r.');
-    v = vr + vr.';
+    % distance to the BS 7910 interaction limit, which moves at most at
+    % 3 (dr1 + dr2)/dN (flpm.internal.coalesce)
+    rr = r + r.';
+    g = max(hypot(S.s - S.s.', S.z - S.z.') - rr, 0);
+    gapA = hypot(abs(S.y - S.y.'), g) - rr;
+    sx = abs(S.s - S.s.') - rr;  sz = abs(S.z - S.z.') - rr;
+    gapC = min(max(sx - 2*min(r, r.'), sz), max(sz - rr, sx));
+    gap = max(gapA, gapC);
+    v = 3 * (vr + vr.');
     allow = 0.5 * gap + min(small, small.');
-    mask = v > 0 & ~eye(n, 'logical');
+    mask = v > 0 & ~eye(n, 'logical') & gap > 0;
     if any(mask(:))
         dN = min(dN, min(allow(mask) ./ v(mask)));
     end

@@ -31,7 +31,9 @@ function pop = defectPopulation(type, varargin)
 %                       free surface, mm                             (required)
 %     'Count'           defects per simulated section, or
 %     'CountPerLength'  defects per mm of free-surface length; the count is
-%                       CountPerLength * SurfaceLength
+%                       CountPerLength * SurfaceLength, or
+%     'CountPerArea'    defects per mm^2 of free surface (3-D sampling); the
+%                       count is CountPerArea * SurfaceLength * AxialLength
 %     'CountModel'      'fixed' | 'poisson'                          ['fixed']
 %     'Threshold'       discard sampled sizes <= u (peaks over threshold)
 %     'SizeBounds', 'DepthBounds'  truncation [1e-6 Inf], [0 Inf]
@@ -50,6 +52,7 @@ ip.addParameter('SizeOffset', 0, @(x) isscalar(x) && x >= 0);
 ip.addParameter('Depth', []);
 ip.addParameter('Count', []);
 ip.addParameter('CountPerLength', []);
+ip.addParameter('CountPerArea', []);
 ip.addParameter('CountModel', 'fixed');
 ip.addParameter('Threshold', [], @(x) isempty(x) || (isscalar(x) && x >= 0));
 ip.addParameter('SizeBounds', [1e-6 Inf]);
@@ -62,10 +65,11 @@ r = ip.Results;
 if isempty(r.Size)
     error('flpm:population:size', 'A ''Size'' descriptor is required.');
 end
-if isempty(r.Count) == isempty(r.CountPerLength)
-    error('flpm:population:count', 'Give exactly one of ''Count'' or ''CountPerLength''.');
+if ~isempty(r.Count) + ~isempty(r.CountPerLength) + ~isempty(r.CountPerArea) ~= 1
+    error('flpm:population:count', ...
+        'Give exactly one of ''Count'', ''CountPerLength'' or ''CountPerArea''.');
 end
-cnt = [r.Count r.CountPerLength];
+cnt = [r.Count r.CountPerLength r.CountPerArea];
 if ~(isscalar(cnt) && cnt >= 0)
     error('flpm:population:count', 'The defect count must be a non-negative scalar.');
 end
@@ -76,6 +80,7 @@ pop.sizeOffset = r.SizeOffset;
 pop.sizeBounds = r.SizeBounds;
 pop.count = r.Count;
 pop.countPerLength = r.CountPerLength;
+pop.countPerArea = r.CountPerArea;
 pop.countModel = validatestring(r.CountModel, {'fixed', 'poisson'});
 pop.threshold = r.Threshold;
 switch type

@@ -13,6 +13,7 @@ function [T, sets] = monteCarlo(pops, mat, varargin)
 %   Name-value pairs
 %     'SurfaceLength'   free-surface length per simulation, mm (required
 %                       unless 'DefectSets' is given); pi*D for a round bar
+%     'AxialLength'     gauge length over which defects are spread, mm [0]
 %     'NumSimulations'  number of draws                              [400]
 %     'Seed'            seed of the per-simulation substreams          [0]
 %     'Options'         flpm.options(...)
@@ -29,6 +30,7 @@ function [T, sets] = monteCarlo(pops, mat, varargin)
 
 ip = inputParser;
 ip.addParameter('SurfaceLength', []);
+ip.addParameter('AxialLength', 0);
 ip.addParameter('NumSimulations', 400, @(x) isscalar(x) && x >= 1);
 ip.addParameter('Seed', 0);
 ip.addParameter('Options', []);
@@ -50,16 +52,17 @@ else
     nSim = numel(sets);
 end
 L = r.SurfaceLength;
+Lz = r.AxialLength;
 seed = r.Seed;
 
 rows = cell(nSim, 1);
 if r.UseParallel && canUseParallelPool()
     parfor k = 1:nSim
-        [sets{k}, rows{k}] = runOne(k, sets{k}, sampleInside, pops, mat, opts, L, seed);
+        [sets{k}, rows{k}] = runOne(k, sets{k}, sampleInside, pops, mat, opts, L, Lz, seed);
     end
 else
     for k = 1:nSim
-        [sets{k}, rows{k}] = runOne(k, sets{k}, sampleInside, pops, mat, opts, L, seed);
+        [sets{k}, rows{k}] = runOne(k, sets{k}, sampleInside, pops, mat, opts, L, Lz, seed);
     end
 end
 T = struct2table(vertcat(rows{:}));
@@ -69,10 +72,11 @@ T.Properties.VariableUnits = {'', 'MPa', '', '', 'cycles', '', '', '', '', ...
 end
 
 % -------------------------------------------------------------------------
-function [set, row] = runOne(k, set, sampleInside, pops, mat, opts, L, seed)
+function [set, row] = runOne(k, set, sampleInside, pops, mat, opts, L, Lz, seed)
 t0 = tic;
 if sampleInside
-    set = flpm.samplePopulation(pops, 'simulation', k, 'SurfaceLength', L, 'Seed', seed);
+    set = flpm.samplePopulation(pops, 'simulation', k, 'SurfaceLength', L, ...
+        'AxialLength', Lz, 'Seed', seed);
 end
 n = numel(set.size);
 row = struct('stress', mat.dSigma_e, 'converged', true, 'stepInSN', false, ...
@@ -99,7 +103,10 @@ if numel(set.size) < 2
     s = NaN; return
 end
 r = set.size / sqrt(pi);
-d = hypot(set.position - set.position(k), set.depth - set.depth(k)) - r - r(k);
+y = zeros(size(r));
+if isfield(set, 'axial') && ~isempty(set.axial), y = set.axial; end
+d = sqrt((set.position - set.position(k)).^2 + (set.depth - set.depth(k)).^2 ...
+    + (y - y(k)).^2) - r - r(k);
 d(k) = Inf;
 s = max(min(d), 0);
 end

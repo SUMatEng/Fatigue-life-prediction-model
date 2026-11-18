@@ -11,10 +11,14 @@ function sets = samplePopulation(pops, nSim, varargin)
 %         number of defects for 'CountPerLength' populations and the range
 %         of positions along the surface, i.e. the size of the statistical
 %         sample. It does not enter the stress-intensity solution. Required.
+%   'AxialLength'    length (mm) along the load axis over which defects are
+%         spread (3-D sampling; the gauge length). 0 puts every defect in
+%         one plane, as in the published model.                     [0]
 %   'Seed'  seed of the random streams                               [0]
 %
 %   Each set is a struct with column vectors size (sqrt(area), mm), depth
-%   (mm), position (mm, uniform on [0, L)) and population (index).
+%   (mm), position (mm, uniform on [0, L)), axial (mm, uniform on
+%   [0, AxialLength)) and population (index).
 %   Surface valleys of depth Rv and shielding factor Y_R become surface-
 %   breaking discs centred on the surface whose part below the surface has
 %   sqrt(area) = (Y_R/0.65)^2 Rv, so that K = Y_R s sqrt(pi Rv).
@@ -26,6 +30,7 @@ ip = inputParser;
 ip.addParameter('Seed', 0);
 ip.addParameter('simulation', []);
 ip.addParameter('SurfaceLength', [], @(x) isscalar(x) && x > 0);
+ip.addParameter('AxialLength', 0, @(x) isscalar(x) && x >= 0);
 if ischar(nSim) || isstring(nSim)
     varargin = [{nSim}, varargin];
     nSim = [];
@@ -37,24 +42,34 @@ if isempty(L)
 end
 if isstruct(pops), pops = num2cell(pops); end
 seed = ip.Results.Seed;
+Lz = ip.Results.AxialLength;
 if ~isempty(ip.Results.simulation)
-    sets = drawOne(pops, L, seed, ip.Results.simulation);
+    sets = drawOne(pops, L, Lz, seed, ip.Results.simulation);
     return
 end
 sets = cell(nSim, 1);
 for k = 1:nSim
-    sets{k} = drawOne(pops, L, seed, k);
+    sets{k} = drawOne(pops, L, Lz, seed, k);
 end
 end
 
-function set = drawOne(pops, L, seed, k)
+function set = drawOne(pops, L, Lz, seed, k)
 rs = RandStream('mrg32k3a', 'Seed', seed);
 rs.Substream = k;
 Ys = flpm.internal.constants().Ysurface;
 parts = cell(numel(pops), 1);
 for j = 1:numel(pops)
     p = pops{j};
-    if ~isempty(p.countPerLength), mu = p.countPerLength * L; else, mu = p.count; end
+    if ~isempty(p.countPerLength)
+        mu = p.countPerLength * L;
+    elseif isfield(p, 'countPerArea') && ~isempty(p.countPerArea)
+        if Lz <= 0
+            error('flpm:sample:axial', '''CountPerArea'' needs ''AxialLength'' > 0.');
+        end
+        mu = p.countPerArea * L * Lz;
+    else
+        mu = p.count;
+    end
     if strcmp(p.countModel, 'poisson'), n = poissinv(rand(rs), mu); else, n = round(mu); end
     sz = flpm.internal.sampleDescriptor(p.size, n, p.sizeBounds, rs) + p.sizeOffset;
     if strcmp(p.type, 'volumetric')
@@ -63,18 +78,19 @@ for j = 1:numel(pops)
         dep = zeros(n, 1);
     end
     pos = L * rand(rs, n, 1);
+    ax = Lz * rand(rs, n, 1);
     if ~isempty(p.threshold)
         keep = sz > p.threshold;
-        sz = sz(keep); dep = dep(keep); pos = pos(keep);
+        sz = sz(keep); dep = dep(keep); pos = pos(keep); ax = ax(keep);
         n = numel(sz);
     end
     if strcmp(p.type, 'surface')
         sz = sqrt(2) * (p.shielding / Ys)^2 * sz;   % half-disc below the surface
     end
-    parts{j} = [sz, dep, pos, repmat(j, n, 1)];
+    parts{j} = [sz, dep, pos, ax, repmat(j, n, 1)];
 end
 M = vertcat(parts{:});
-if isempty(M), M = zeros(0, 4); end
+if isempty(M), M = zeros(0, 5); end
 set = struct('size', M(:,1), 'depth', M(:,2), 'position', M(:,3), ...
-    'population', M(:,4));
+    'axial', M(:,4), 'population', M(:,5));
 end
