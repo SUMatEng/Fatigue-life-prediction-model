@@ -103,10 +103,11 @@ by K of the same crack alone, with the same mesh settings.
 | coplanar, edge gap 0.1 r | 1.27 / 1.25 | 1.29 |
 | coplanar, edge gap 0.5 r | 1.07 / 1.06 | 1.06 |
 | stacked, 0.25 r apart | 0.72 | 0.74 |
+| offset: in-plane centre distance 2.2 r, 0.5 r apart along the load | 1.13 / 1.12 | 1.10 |
 
 The factor agrees with FE to within 3 %, which is inside the FE accuracy.
-It is kept as it is, with no correction. Gaps below 0.1 r could not be
-meshed within the 16 GB of memory available. Such pairs link up after a
+It is kept as it is, with no correction. Gaps below 0.1 r, and a pair of unequal cracks (r₂ = 0.5 r₁), could not
+be run within the 16 GB of memory available. Such pairs link up after a
 very small amount of growth, so they matter little for the life. Published SIF tables (Kachanov & Laures 1989) were not accessible; the
 factor was instead checked against 3D FE (below). The method
 is known to be accurate to a few percent down to gaps of about 0.1 r and
