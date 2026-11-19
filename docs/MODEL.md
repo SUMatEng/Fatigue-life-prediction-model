@@ -88,11 +88,27 @@ on a 32 × 64 area-uniform grid at 24 front points.
 | edge gap > 4 (r₁ + r₂) | 1 | cut-off, amplification < ~1 % |
 
 The "converged reference" values are from the same formulation on a
-4-times finer grid. **Calibration against independent published SIF
-solutions is pending:** the tabulated results of Kachanov & Laures (1989)
-and of the boundary-element studies on coplanar and stacked penny cracks
-were not accessible (paywalled). The qualitative behaviour (amplification
-in the plane, shielding when stacked) is the established one. The method
+4-times finer grid.
+
+**Check against 3D FE (19 Nov 2026).** The cracks were modelled as thin
+oblate cavities (half-thickness 0.03 r) in a block under remote tension,
+using the MATLAB PDE Toolbox with linear tetrahedra
+(`validation/fe/feCrackK.m`). K was taken from the crack-opening
+displacement by displacement extrapolation. γ_FE is K of the pair divided
+by K of the same crack alone, with the same mesh settings.
+
+| Configuration (equal cracks) | γ, FE | γ, this code |
+|---|---|---|
+| single crack, K / Sneddon | 0.97 (±2.5 % around the front) | 1 |
+| coplanar, edge gap 0.1 r | 1.27 / 1.25 | 1.29 |
+| coplanar, edge gap 0.5 r | 1.07 / 1.06 | 1.06 |
+| stacked, 0.25 r apart | 0.72 | 0.74 |
+
+The factor agrees with FE to within 3 %, which is inside the FE accuracy.
+It is kept as it is, with no correction. Gaps below 0.1 r could not be
+meshed within the 16 GB of memory available. Such pairs link up after a
+very small amount of growth, so they matter little for the life. Published SIF tables (Kachanov & Laures 1989) were not accessible; the
+factor was instead checked against 3D FE (below). The method
 is known to be accurate to a few percent down to gaps of about 0.1 r and
 to under-predict the amplification at smaller gaps.
 

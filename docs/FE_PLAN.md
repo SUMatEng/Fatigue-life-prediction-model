@@ -1,7 +1,9 @@
 # Proposal: image-based FE of real XCT defect clusters
 
-Status: **proposal only. No FE campaign has been started.** It needs your
-go-ahead, because it is a substantial computing and meshing effort.
+Status (19 Nov 2026): **superseded.** With no real geometries, the check
+was reduced to idealised penny-crack pairs, which agree with the factor
+to within 3 % (docs/MODEL.md). The real-geometry campaign below is not
+pursued.
 
 ## Purpose
 

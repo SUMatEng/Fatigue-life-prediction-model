@@ -39,6 +39,24 @@ along it. Results are median and interquartile range, in MPa:
   severity beyond what volume 2 already has.
 
 
+### FE check of the interaction factor (19 Nov 2026)
+
+There are no real pore geometries, so the check uses idealised penny
+cracks only (Thorsten: keep it simple). The 3D FE (PDE Toolbox) agrees
+with the Kachanov factor to within 3 %: gap 0.1 r gives 1.27 by FE against
+1.29, gap 0.5 r gives 1.07 against 1.06, and stacked at 0.25 r gives
+0.72 against 0.74. The factor is kept unchanged. See `docs/MODEL.md`.
+
+Where interaction matters in your data:
+* Bars 21/22/23 (CT_excel): the largest factor is 1.06, and only 6 pairs
+  are closer than r1 + r2.
+* NTU XY set (31,887 pores): 657 separated pores have a factor above
+  1.1, 131 above 1.2 and some up to about 2. A further 947 pores have
+  overlapping projections and link up (`validation/fe/rankClusters.m`).
+
+The FE plan in `docs/FE_PLAN.md` (real geometries, surrogate) is not
+pursued.
+
 ### Interaction factor vs BS 7910 (18 Nov 2026)
 
 The published XCT sets (200 per set) were rerun with the continuous
