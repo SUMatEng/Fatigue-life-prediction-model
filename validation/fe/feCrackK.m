@@ -75,8 +75,18 @@ model.VertexBC(bot(k1)) = vertexBC(XDisplacement = 0, YDisplacement = 0);
 model.VertexBC(bot(k2)) = vertexBC(YDisplacement = 0);
 hf = arrayfun(@(i) o.MeshFace * c(i, 4), 1:n, 'UniformOutput', false);
 hfc = [num2cell(fc); hf];
-model = generateMesh(model, 'Hmax', L / 6, 'Hmin', 0.15 * o.MeshFace * min(c(:, 4)), ...
-    'Hface', hfc(:)', 'Hgrad', 1.4);
+% retry with other size limits: close crack pairs can fail to mesh
+tries = [6 0.15 1.4; 10 0.08 1.4; 8 0.3 1.3; 12 0.05 1.5];
+for k = 1:size(tries, 1)
+    try
+        model = generateMesh(model, 'Hmax', L / tries(k, 1), ...
+            'Hmin', tries(k, 2) * o.MeshFace * min(c(:, 4)), ...
+            'Hface', hfc(:)', 'Hgrad', tries(k, 3));
+        break
+    catch err
+        if k == size(tries, 1), rethrow(err), end
+    end
+end
 R = solve(model);
 P = model.Geometry.Mesh.Nodes;
 uz = R.Displacement.uz(:)';
