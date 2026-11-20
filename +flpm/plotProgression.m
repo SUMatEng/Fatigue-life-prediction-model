@@ -13,8 +13,8 @@ function fig = plotProgression(out, varargin)
 %   the selected moments, light to dark in time; the last of them is
 %   filled, with the crack of largest dK in red. Discs cut by the surface
 %   are clipped at depth 0. By default the moments cover the interaction
-%   stage: up to the last link-up, or until the largest crack is 4 times
-%   its initial size if that is later; the long-crack stage that follows
+%   stage: until the largest crack is 4 times its initial size, or up to
+%   the first link-up if that is later; the long-crack stage that follows
 %   is in the right panel. Right: the largest crack against cycles (log
 %   scale), with the shown moments marked and link-ups as dotted lines.
 %
@@ -52,7 +52,7 @@ n = numel(F);
 link = find(arrayfun(@(k) numel(F(k).id) < numel(F(k-1).id), 2:n)) + 1;
 am = arrayfun(@(f) max(f.size), F);
 stage = find(am <= 4 * am(1), 1, 'last');
-if ~isempty(link), stage = max(stage, link(end)); end
+if ~isempty(link), stage = max(stage, link(1)); end
 
 % moments to show
 if isempty(o.Frames) || isscalar(o.Frames)
