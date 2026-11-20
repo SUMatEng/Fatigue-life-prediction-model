@@ -12,7 +12,8 @@ function opts = options(varargin)
 %                    any crack per increment                        [0.005]
 %   'MaxStep', 'MinStep'  bounds on the increment (cycles)       [1e4, 1]
 %   'StressTol'      stress tolerance of the strength solver (MPa)  [0.05]
-%   'RecordHistory'  keep N, a_max and the number of defects    [false]
+%   'RecordHistory'  keep N, a_max, number of defects and crack
+%                    snapshots (for flpm.plotProgression)      [false]
 %   'ResidualStress' residual stress normal to the crack plane (MPa,
 %                    tensile positive) as a function of depth below the
 %                    free surface (mm), e.g. @(z) -400*exp(-z/0.1);

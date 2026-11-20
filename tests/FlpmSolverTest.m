@@ -17,6 +17,24 @@ classdef FlpmSolverTest < matlab.unittest.TestCase
     end
 
     methods (Test)
+        function progressionFramesAndPlot(tc)
+            % snapshots start at N = 0, are ordered in N, end at the final
+            % state, and the plot (with a GIF) is produced
+            r = flpm.fatigueLife(450, tc.multi, tc.mat, flpm.options('RecordHistory', true));
+            F = r.frames;
+            tc.verifyGreaterThan(numel(F), 2);
+            tc.verifyEqual(F(1).N, 0);
+            tc.verifyTrue(all(diff([F.N]) >= 0));
+            tc.verifyEqual(F(end).size, r.final.size);
+            tc.verifyLessThan(numel(F(end).id), numel(F(1).id));  % link-up
+            gif = [tempname '.gif'];
+            fig = flpm.plotProgression(r, 'Visible', 'off', 'Animate', gif);
+            tc.addTeardown(@() close(fig));
+            tc.addTeardown(@() delete(gif));
+            tc.verifyEqual(numel(findobj(fig, 'Type', 'axes')), 2);
+            tc.verifyTrue(isfile(gif));
+        end
+
         function stepSizeConvergence(tc)
             % halving Eta changes the life by < 0.5 %
             for s = [300 400]

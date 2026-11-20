@@ -61,6 +61,7 @@ axial positions with `flpm.defectSet(size, depth, position, 'Axial', y)`.
 | `flpm.roughnessShielding` | Y_R and √area_R from Rv and RSm |
 | `flpm.fitGrowthLaw` | Calibrate the near-threshold growth law (air, or sealed/vacuum) from da/dN data |
 | `flpm.projectedArea` | √area on the plane normal to the load, from XCT projections or an ellipsoid |
+| `flpm.plotProgression` | Visual of crack growth, interaction and link-up in the fracture plane, with crack size against cycles (optional GIF) |
 | `flpm.arrestMap`, `flpm.weakestLink` | Closed-form strength distribution P_s = exp(−Λ), stress fields, killer probabilities |
 | `flpm.fitSN`, `flpm.compareSN` | Random fatigue-limit S–N fit (censored run-outs); test of the predicted limit |
 | `flpm.killerDistribution` | Predicted killer size/depth, KS tests vs fractography |

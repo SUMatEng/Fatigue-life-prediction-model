@@ -35,6 +35,11 @@ function out = fatigueLife(stressRange, defects, mat, opts)
 %     nSteps   number of increments
 %     final    state at the end (mm)
 %     history  (opts.RecordHistory) N, a_max (mm), number of defects
+%     frames   (opts.RecordHistory) snapshots of every crack, struct array
+%              with N, size, depth, position, axial (mm), id, dK and
+%              gamma, taken at the start, at every link-up, whenever a
+%              crack has grown by 2 % since the last frame, and at the end
+%              (for flpm.plotProgression)
 
 if nargin < 4 || isempty(opts)
     opts = flpm.options();
@@ -55,6 +60,11 @@ N = 0;
 nSteps = 0;
 gRef = struct('id', [], 'a', [], 'gam', [], 'tol', []);
 hist = zeros(opts.RecordHistory * 1024, 3);
+frames = struct('N', {}, 'size', {}, 'depth', {}, 'position', {}, ...
+    'axial', {}, 'id', {}, 'dK', {}, 'gamma', {});
+lastA = [];
+lastId = [];
+Nc = 0;                            % cycles reached (finite even at arrest)
 while true
     nSteps = nSteps + 1;
     S = flpm.internal.coalesce(S);
@@ -68,6 +78,10 @@ while true
     gam = gRef.gam;
     Y = Y .* gam;                      % interaction amplifies or shields K
     S.dK = s * Y .* sqrt(pi * A);
+    if opts.RecordHistory && (~isequal(lastId, S.id) || any(S.a > 1.02 * lastA))
+        frames(end + 1) = frame(S, Nc, gam); %#ok<AGROW>
+        lastA = S.a; lastId = S.id;
+    end
 
     % fracture of the specimen: K of each crack without the amplification
     % by its neighbours (amplified K >= KIC on the side facing a neighbour
@@ -104,6 +118,7 @@ while true
     S.a = S.a + rate * dN;
     S.ext = S.ext + rate * dN;
     N = N + dN;
+    Nc = N;
     if opts.RecordHistory
         if nSteps > size(hist, 1), hist = [hist; zeros(size(hist))]; end %#ok<AGROW>
         hist(nSteps, :) = [N, max(S.a) * 1e3, numel(S.a)];
@@ -121,7 +136,18 @@ if opts.RecordHistory
     h = hist(1:min(nSteps, size(hist, 1)), :);
     h = h(h(:,1) > 0, :);
     out.history = struct('N', h(:,1), 'aMax', h(:,2), 'nDefects', h(:,3));
+    gEnd = flpm.internal.interactionFactor(S);
+    fEnd = frame(S, N, gEnd);
+    fEnd.N = Nc;
+    frames(end + 1) = fEnd;
+    out.frames = frames;
+    out.stress = s;
 end
+end
+
+function f = frame(S, N, gam)
+f = struct('N', N, 'size', S.a * 1e3, 'depth', S.z * 1e3, 'position', S.s * 1e3, ...
+    'axial', S.y * 1e3, 'id', S.id, 'dK', S.dK, 'gamma', gam);
 end
 
 % -------------------------------------------------------------------------
