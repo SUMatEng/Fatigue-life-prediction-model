@@ -23,7 +23,7 @@ function fig = plotProgression(out, varargin)
 %                Default: start, every link-up and the end of the
 %                interaction stage, plus evenly spaced moments, 6 in all
 %     'Window'   [s0 s1 z0 z1] (mm) of the left panel. Default: the cracks
-%                that grew or linked up, with a margin (all if none grew)
+%                that grew by > 20 % or linked up in the interaction stage, with a margin
 %     'Animate'  GIF file: the moments in turn (at most 'MaxImages', most
 %                of them in the interaction stage), the left panel at that
 %                moment and the right panel up to its cycles
@@ -178,10 +178,10 @@ grid(ax, 'on'); box(ax, 'on'); hold(ax, 'off');
 end
 
 function win = defaultWindow(a, b)
-% cracks that grew or linked up between snapshots a and b
+% cracks that grew by more than 20 % or linked up between snapshots a and b
 [tf, loc] = ismember(a.id, b.id);
 moved = ~tf;
-moved(tf) = b.size(loc(tf)) > 1.001 * a.size(tf);
+moved(tf) = b.size(loc(tf)) > 1.2 * a.size(tf);       % grew by > 20 %
 if ~any(moved), moved = true(size(a.size)); end
 keepB = ismember(b.id, a.id(moved));
 r = [a.size(moved); b.size(keepB)] / sqrt(pi);
