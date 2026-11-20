@@ -188,7 +188,7 @@ end
 
 function s = groupedInt(x)
 s = sprintf('%.0f', x);
-s = regexprep(s, '(\\d)(?=(\\d{3})+$)', '$1,');
+s = regexprep(s, '(\d)(?=(\d{3})+$)', '$1,');
 end
 
 function win = defaultWindow(a, b)
