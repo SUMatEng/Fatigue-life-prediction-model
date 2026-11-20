@@ -10,19 +10,24 @@ function fig = plotProgression(out, varargin)
 %   surface against depth below it, with the free surface at depth 0. Each
 %   crack is the disc of its sqrt(area), radius sqrt(area/pi), seen along
 %   the load axis (axial offsets are not shown). Outlines show the cracks at
-%   the selected moments, light to dark in time; the last state is filled,
-%   with the crack that governs the end (largest dK) in red. Discs cut by
-%   the surface are clipped at depth 0. Right: the largest crack against
-%   cycles, with the selected moments marked and link-ups as dotted lines.
+%   the selected moments, light to dark in time; the last of them is
+%   filled, with the crack of largest dK in red. Discs cut by the surface
+%   are clipped at depth 0. By default the moments cover the interaction
+%   stage: up to the last link-up, or until the largest crack is 4 times
+%   its initial size if that is later; the long-crack stage that follows
+%   is in the right panel. Right: the largest crack against cycles (log
+%   scale), with the shown moments marked and link-ups as dotted lines.
 %
 %   Name-value pairs
 %     'Frames'   number of moments to show, or indices into r.frames.
-%                Default: start, every link-up and the end, plus evenly
-%                spaced moments, at most 6 in all
+%                Default: start, every link-up and the end of the
+%                interaction stage, plus evenly spaced moments, 6 in all
 %     'Window'   [s0 s1 z0 z1] (mm) of the left panel. Default: the cracks
 %                that grew or linked up, with a margin (all if none grew)
-%     'Animate'  GIF file: one image per recorded frame, with the left panel
-%                showing that moment and the right panel the cycles so far
+%     'Animate'  GIF file: the moments in turn (at most 'MaxImages', most
+%                of them in the interaction stage), the left panel at that
+%                moment and the right panel up to its cycles
+%     'MaxImages' images in the GIF                                    [60]
 %     'Delay'    seconds per GIF image                                [0.15]
 %     'Visible'  figure visibility, 'on' or 'off'                       ['on']
 %
@@ -34,6 +39,7 @@ ip.addParameter('Frames', []);
 ip.addParameter('Window', []);
 ip.addParameter('Animate', '');
 ip.addParameter('Delay', 0.15);
+ip.addParameter('MaxImages', 60);
 ip.addParameter('Visible', 'on');
 ip.parse(varargin{:});
 o = ip.Results;
@@ -44,16 +50,19 @@ end
 F = out.frames;
 n = numel(F);
 link = find(arrayfun(@(k) numel(F(k).id) < numel(F(k-1).id), 2:n)) + 1;
+am = arrayfun(@(f) max(f.size), F);
+stage = find(am <= 4 * am(1), 1, 'last');
+if ~isempty(link), stage = max(stage, link(end)); end
 
 % moments to show
 if isempty(o.Frames) || isscalar(o.Frames)
     m = 6;
     if isscalar(o.Frames), m = o.Frames; end
-    key = unique([1, link, n]);
+    key = unique([1, link, stage]);
     if numel(key) > m
         key = key(unique(round(linspace(1, numel(key), m))));
     end
-    extra = round(linspace(1, n, m));
+    extra = round(linspace(1, stage, m));
     k = unique([key, extra(~ismember(extra, key))]);
     while numel(k) > m
         free = find(~ismember(k, key));
@@ -68,9 +77,12 @@ end
 sel = sel(sel >= 1 & sel <= n);
 
 win = o.Window;
-if isempty(win), win = defaultWindow(F); end
+if isempty(win), win = defaultWindow(F(1), F(stage)); end
 
-fig = figure('Color', 'w', 'Visible', o.Visible, 'Position', [100 100 1100 440]);
+fig = figure('Color', 'w', 'Visible', o.Visible, 'Position', [100 100 1000 420]);
+if exist('theme', 'file') == 2 || exist('theme', 'builtin') == 5
+    try, theme(fig, 'light'); catch, end
+end
 t = tiledlayout(fig, 1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
 ax1 = nexttile(t);
 ax2 = nexttile(t);
@@ -81,7 +93,9 @@ drawCurve(ax2, out, F, sel, link, cmap, numel(F));
 title(t, sprintf('\\Delta\\sigma = %.0f MPa: %s', out.stress, outcome(out)));
 
 if ~isempty(o.Animate)
-    for j = 1:n
+    late = min(10, floor(o.MaxImages / 4));
+    early = round(linspace(1, stage, min(stage, o.MaxImages - late)));
+    for j = unique([early, round(linspace(stage, n, late + 1))])
         drawPlane(ax1, F, j, [0.35 0.35 0.35], win);
         drawCurve(ax2, out, F, j, link(link <= j), [0.35 0.35 0.35], j);
         drawnow;
@@ -91,7 +105,7 @@ if ~isempty(o.Animate)
             imwrite(A, map, o.Animate, 'gif', 'LoopCount', Inf, 'DelayTime', o.Delay);
         else
             imwrite(A, map, o.Animate, 'gif', 'WriteMode', 'append', ...
-                'DelayTime', o.Delay * (1 + 9 * (j == n)));
+                'DelayTime', o.Delay * (1 + 14 * (j == n)));
         end
     end
     % leave the static figure in place
@@ -141,6 +155,7 @@ function drawCurve(ax, out, F, sel, link, cmap, upto)
 cla(ax); hold(ax, 'on');
 Nf = [F.N];
 am = arrayfun(@(f) max(f.size), F);
+set(ax, 'YScale', 'log');
 if isfield(out, 'history') && ~isempty(out.history.N)
     Nh = [0; out.history.N];
     ah = [am(1); out.history.aMax];
@@ -162,9 +177,8 @@ if Nf(end) > 0, xlim(ax, [0 1.02 * Nf(end)]); end
 grid(ax, 'on'); box(ax, 'on'); hold(ax, 'off');
 end
 
-function win = defaultWindow(F)
-% cracks that grew or linked up between the first and the last frame
-a = F(1); b = F(end);
+function win = defaultWindow(a, b)
+% cracks that grew or linked up between snapshots a and b
 [tf, loc] = ismember(a.id, b.id);
 moved = ~tf;
 moved(tf) = b.size(loc(tf)) > 1.001 * a.size(tf);
