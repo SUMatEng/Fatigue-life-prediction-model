@@ -158,9 +158,9 @@ the local Kmax, and the K_IC check also uses it. A crack with
 σ_max + σ_res ≤ 0 is closed throughout the cycle and does not grow. The
 residual stress is evaluated at the defect centre: there is no gradient
 over the crack and no relaxation. It is a hook for measured profiles
-(e.g. hole drilling or XRD after machining or shot peening). Whether a
-superposition through R alone is adequate for LPBF Ti-6Al-4V needs your
-confirmation.
+(e.g. hole drilling or XRD after machining or shot peening). Confirmed
+(20 Nov 2026) as the intended treatment: residual stress enters only
+through the local R. No measured profiles are available yet.
 
 ## Projected area from XCT morphology
 
@@ -224,7 +224,31 @@ from vacuum or internal-crack data, for example digitised curves from the
 papers above or your own SR-CT data. Note that C1 changes only the life.
 The fatigue strength at 10⁷ cycles changes only through the sealed
 thresholds, because the strength is an arrest step. The closure length l
-keeps its air value.
+keeps its air value. As of 20 Nov 2026 no vacuum or internal da/dN data
+are available, so `mat.sealed` stays empty.
+
+## Visualising crack progression
+
+`flpm.fatigueLife(..., flpm.options('RecordHistory', true))` stores
+snapshots of every crack (`out.frames`): at the start, at every link-up,
+whenever a crack has grown by 2 %, and at the end.
+`flpm.plotProgression(out)` draws them in the fracture plane (position
+along the surface against depth, free surface at the top) next to the
+largest √area against cycles; `'Animate', 'file.gif'` writes an
+animation. The view shows projections along the load axis, so cracks in
+different planes may appear to overlap without linking up.
+
+![Crack progression](figures/progression_synthetic.png)
+
+*Five pores (√area 45–70 µm) at Δσ = 300 MPa, R = 0.1 (strength of the
+set 262 MPa). Three neighbouring pores near 0.2 mm depth interact, link
+up at about 1.2 × 10⁴ and 1.4 × 10⁴ cycles, and the merged internal
+crack grows on until K_IC. Two late link-ups (dotted lines near
+1.2 × 10⁵ cycles) are the far pores being swallowed. Without a specimen
+diameter the half-space lets the crack grow to unrealistic sizes, and
+the stage above about 0.3 mm takes some 60 % of the life here; in a real
+specimen it would be cut short. The fatigue strength, an arrest step, is
+not affected.*
 
 ## Termination
 
