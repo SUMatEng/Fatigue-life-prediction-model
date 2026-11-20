@@ -98,8 +98,10 @@ if ~isempty(o.Animate)
     late = min(10, floor(o.MaxImages / 4));
     early = round(linspace(1, stage, min(stage, o.MaxImages - late)));
     for j = unique([early, round(linspace(stage, n, late + 1))])
-        drawPlane(ax1, F, j, [0.35 0.35 0.35], win);
-        drawCurve(ax2, out, F, j, link(link <= j), [0.35 0.35 0.35], j);
+        drawPlane(ax1, F, unique([1 j]), [0.75 0.82 0.95; 0.1 0.25 0.55], win);
+        drawCurve(ax2, out, F, j, link(link <= j), [0.85 0.2 0.15], j);
+        title(t, sprintf('\\Delta\\sigma = %.0f MPa,  N = %s cycles,  %d cracks', ...
+            out.stress, groupedInt(F(j).N), numel(F(j).id)));
         drawnow;
         im = frame2im(getframe(fig));
         [A, map] = rgb2ind(im, 128);
@@ -111,6 +113,7 @@ if ~isempty(o.Animate)
         end
     end
     % leave the static figure in place
+    title(t, sprintf('\\Delta\\sigma = %.0f MPa: %s', out.stress, outcome(out)));
     drawPlane(ax1, F, sel, cmap, win);
     drawCurve(ax2, out, F, sel, link, cmap, numel(F));
 end
@@ -161,11 +164,15 @@ set(ax, 'YScale', 'log');
 if isfield(out, 'history') && ~isempty(out.history.N)
     Nh = [0; out.history.N];
     ah = [am(1); out.history.aMax];
-    keep = Nh <= Nf(upto);
-    plot(ax, Nh(keep), ah(keep) * 1e3, 'k-', 'LineWidth', 1.2);
 else
-    plot(ax, Nf(1:upto), am(1:upto) * 1e3, 'k-', 'LineWidth', 1.2);
+    Nh = Nf(:); ah = am(:);
 end
+keep = Nh <= Nf(upto);
+if upto < numel(F)                       % animation: whole curve faint
+    plot(ax, Nh, ah * 1e3, '-', 'Color', [0.85 0.85 0.85], 'LineWidth', 1.2);
+end
+plot(ax, Nh(keep), ah(keep) * 1e3, 'k-', 'LineWidth', 1.2);
+ylim(ax, [min(ah) max(ah)] .* [0.9 1.1] * 1e3);
 for L = link(:).'
     xline(ax, Nf(L), ':', 'Color', [0.4 0.4 0.4]);
 end
@@ -177,6 +184,11 @@ xlabel(ax, 'cycles N');
 ylabel(ax, 'largest \surdarea (\mum)');
 if Nf(end) > 0, xlim(ax, [0 1.02 * Nf(end)]); end
 grid(ax, 'on'); box(ax, 'on'); hold(ax, 'off');
+end
+
+function s = groupedInt(x)
+s = sprintf('%.0f', x);
+s = regexprep(s, '(\\d)(?=(\\d{3})+$)', '$1,');
 end
 
 function win = defaultWindow(a, b)
