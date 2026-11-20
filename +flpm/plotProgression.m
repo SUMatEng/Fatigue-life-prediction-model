@@ -58,7 +58,7 @@ if ~isempty(link), stage = max(stage, link(1)); end
 if isempty(o.Frames) || isscalar(o.Frames)
     m = 6;
     if isscalar(o.Frames), m = o.Frames; end
-    key = unique([1, link, stage]);
+    key = unique([1, link(link <= stage), stage]);
     if numel(key) > m
         key = key(unique(round(linspace(1, numel(key), m))));
     end
@@ -164,7 +164,7 @@ if isfield(out, 'history') && ~isempty(out.history.N)
 else
     plot(ax, Nf(1:upto), am(1:upto) * 1e3, 'k-', 'LineWidth', 1.2);
 end
-for L = link
+for L = link(:).'
     xline(ax, Nf(L), ':', 'Color', [0.4 0.4 0.4]);
 end
 for j = 1:numel(sel)
