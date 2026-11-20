@@ -22,8 +22,10 @@ function fig = plotProgression(out, varargin)
 %     'Frames'   number of moments to show, or indices into r.frames.
 %                Default: start, every link-up and the end of the
 %                interaction stage, plus evenly spaced moments, 6 in all
-%     'Window'   [s0 s1 z0 z1] (mm) of the left panel. Default: the cracks
-%                that grew by > 20 % or linked up in the interaction stage, with a margin
+%     'Window'   [s0 s1 z0 z1] (mm) of the left panel. Default: around the
+%                governing crack at the end of the interaction stage and
+%                the defects it absorbed (other growing cracks may lie
+%                outside; pass a window to see them)
 %     'Animate'  GIF file: the moments in turn (at most 'MaxImages', most
 %                of them in the interaction stage), the left panel at that
 %                moment and the right panel up to its cycles
@@ -178,18 +180,17 @@ grid(ax, 'on'); box(ax, 'on'); hold(ax, 'off');
 end
 
 function win = defaultWindow(a, b)
-% cracks that grew by more than 20 % or linked up between snapshots a and b
-[tf, loc] = ismember(a.id, b.id);
-moved = ~tf;
-moved(tf) = b.size(loc(tf)) > 1.2 * a.size(tf);       % grew by > 20 %
-if ~any(moved), moved = true(size(a.size)); end
-keepB = ismember(b.id, a.id(moved));
-r = [a.size(moved); b.size(keepB)] / sqrt(pi);
-s = [a.position(moved); b.position(keepB)];
-z = [a.depth(moved); b.depth(keepB)];
+% around the governing crack (largest dK) of snapshot b and the original
+% defects it has absorbed, with a margin of its radius
+[~, k] = max(b.dK);
+R = b.size(k) / sqrt(pi);
+in = hypot(a.position - b.position(k), a.depth - b.depth(k)) <= R;
+r = [R; a.size(in) / sqrt(pi)];
+s = [b.position(k); a.position(in)];
+z = [b.depth(k); a.depth(in)];
 lo = [min(s - r), max(min(z - r), 0)];
 hi = [max(s + r), max(z + r)];
-pad = 0.3 * max(hi - lo) + 0.02;
+pad = max(R, 0.25 * max(hi - lo));
 win = [lo(1) - pad, hi(1) + pad, max(lo(2) - pad, 0), hi(2) + pad];
 end
 
